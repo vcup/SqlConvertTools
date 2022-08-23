@@ -16,11 +16,10 @@ public class SqlServerToSqliteCommand : Command
             Description = "connect string of microsoft sql server"
         };
 
-        var sqliteDbFileArgument = new Argument<FileInfo>
+        var sqliteDbFileArgument = new Argument<FileInfo>(() => new FileInfo("{random number}.db"))
         {
             Name = "sqlite_path",
-            Description = "database file path of sqlite, Default: {random number}.db",
-            Arity = ArgumentArity.ZeroOrOne
+            Description = "database file path of sqlite",
         };
 
         AddArgument(mssqlConnectStringArgument);
@@ -29,7 +28,7 @@ public class SqlServerToSqliteCommand : Command
         this.SetHandler(Run, mssqlConnectStringArgument, sqliteDbFileArgument);
     }
 
-    private async Task Run(string mssqlConnString, FileSystemInfo? sqliteDb)
+    private static async Task Run(string mssqlConnString, FileSystemInfo? sqliteDb)
     {
         var sqliteConnectStringBuilder = new SqliteConnectionStringBuilder
         {
