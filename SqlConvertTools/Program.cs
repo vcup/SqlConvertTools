@@ -1,2 +1,8 @@
-﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+﻿using System.CommandLine;
+using SqlConvertTools.Commands;
+
+var rootCommand = new RootCommand();
+
+rootCommand.AddCommand(new SqlServerToSqliteCommand());
+
+await rootCommand.InvokeAsync(args);
