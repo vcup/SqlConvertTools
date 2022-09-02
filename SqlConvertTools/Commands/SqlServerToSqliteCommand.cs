@@ -56,7 +56,14 @@ public class SqlServerToSqliteCommand : Command
             var columnInfos = mssql.DbMaintenance.GetColumnInfosByTableName(table.Name);
             Console.WriteLine($"Creating Table: {table.Name}");
             Console.WriteLine($"Columns: {JsonConvert.SerializeObject(columnInfos.Select(c => c.DbColumnName))}");
-            sqlite.DbMaintenance.CreateTable(table.Name, columnInfos, false);
+
+            foreach (var info in columnInfos.Where(col => col.IsPrimarykey && col.IsIdentity && col.DataType == "int"))
+            {
+                info.DataType = "integer"; // set datatype to integer, but sqlsugar may convert integer(10)
+                info.Length = 0; // for remove (10) from sql
+            }
+
+            sqlite.DbMaintenance.CreateTable(table.Name, columnInfos);
 
             Console.WriteLine($@"Coping table: {table.Name}");
             Console.WriteLine($"Rows Count: {await mssql.Queryable<object>().AS(table.Name).CountAsync()}");
