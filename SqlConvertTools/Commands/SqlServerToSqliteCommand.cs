@@ -28,6 +28,7 @@ public class SqlServerToSqliteCommand : Command
 
         AddArgument(mssqlConnectStringArgument);
         AddArgument(sqliteDbFileArgument);
+        AddOption(ignoreTablesOption);
 
         this.SetHandler(Run, mssqlConnectStringArgument, sqliteDbFileArgument, ignoreTablesOption);
     }
