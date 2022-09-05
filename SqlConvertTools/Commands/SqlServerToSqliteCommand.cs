@@ -22,13 +22,17 @@ public class SqlServerToSqliteCommand : Command
             Description = "database file path of sqlite",
         };
 
+        var ignoreTablesOption = new Option<string[]>(
+            "--ignore-tables",
+            "ignore the given tables, but still create them");
+
         AddArgument(mssqlConnectStringArgument);
         AddArgument(sqliteDbFileArgument);
 
-        this.SetHandler(Run, mssqlConnectStringArgument, sqliteDbFileArgument);
+        this.SetHandler(Run, mssqlConnectStringArgument, sqliteDbFileArgument, ignoreTablesOption);
     }
 
-    private static async Task Run(string mssqlConnString, FileSystemInfo? sqliteDb)
+    private static async Task Run(string mssqlConnString, FileSystemInfo? sqliteDb, string[] ignoreTables)
     {
         var sqliteConnectStringBuilder = new SqliteConnectionStringBuilder
         {
@@ -66,8 +70,14 @@ public class SqlServerToSqliteCommand : Command
 
             sqlite.DbMaintenance.CreateTable(table.Name, columnInfos);
 
+            var rowCount = await mssql.Queryable<object>().AS(table.Name).CountAsync();
+            if (ignoreTables.Any(tbl => tbl == table.Name))
+            {
+                Console.WriteLine($"Ignore this table: {table.Name}, this will skip {rowCount} row");
+            }
+
             Console.WriteLine($@"Coping table: {table.Name}");
-            Console.WriteLine($"Rows Count: {await mssql.Queryable<object>().AS(table.Name).CountAsync()}");
+            Console.WriteLine($"Rows Count: {rowCount}");
             var mssqlData = await mssql.Queryable<object>().AS(table.Name).ToDataTableAsync();
             await sqlite.Fastest<object>()
                 .AS(table.Name)
