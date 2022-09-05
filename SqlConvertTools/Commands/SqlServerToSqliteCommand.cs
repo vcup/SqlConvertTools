@@ -64,7 +64,7 @@ public class SqlServerToSqliteCommand : Command
 
             foreach (var col in columnInfos.Where(col => col.IsIdentity && col.DataType == "int"))
             {
-                col.DataType = "integer"; // set datatype to integer, but sqlsugar may convert integer(10)
+                col.DataType = "integer"; // set datatype to integer, but sqlsugar may convert to integer(10)
                 col.Length = 0; // for remove (10) from sql
                 col.IsPrimarykey = true;
             }
