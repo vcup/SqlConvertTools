@@ -57,10 +57,11 @@ public class SqlServerToSqliteCommand : Command
             Console.WriteLine($"Creating Table: {table.Name}");
             Console.WriteLine($"Columns: {JsonConvert.SerializeObject(columnInfos.Select(c => c.DbColumnName))}");
 
-            foreach (var info in columnInfos.Where(col => col.IsPrimarykey && col.IsIdentity && col.DataType == "int"))
+            foreach (var info in columnInfos.Where(col => col.IsIdentity && col.DataType == "int"))
             {
                 info.DataType = "integer"; // set datatype to integer, but sqlsugar may convert integer(10)
                 info.Length = 0; // for remove (10) from sql
+                info.IsPrimarykey = true;
             }
 
             sqlite.DbMaintenance.CreateTable(table.Name, columnInfos);
