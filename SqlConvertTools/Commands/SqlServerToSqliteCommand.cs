@@ -16,10 +16,10 @@ public class SqlServerToSqliteCommand : Command
             Description = "connect string of microsoft sql server"
         };
 
-        var sqliteDbFileArgument = new Argument<FileInfo>(() => new FileInfo("{random number}.db"))
+        var sqliteDbFileArgument = new Argument<FileInfo>(() => new FileInfo($"{Random.Shared.NextInt64()}.db"))
         {
             Name = "sqlite_path",
-            Description = "database file path of sqlite",
+            Description = "database file path of sqlite, if not specify then will use a random number",
         };
 
         var ignoreTablesOption = new Option<string[]>(
