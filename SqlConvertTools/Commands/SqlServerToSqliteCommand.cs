@@ -75,6 +75,7 @@ public class SqlServerToSqliteCommand : Command
             if (ignoreTables.Any(tbl => tbl == table.Name))
             {
                 Console.WriteLine($"Ignore this table: {table.Name}, this will skip {rowCount} row");
+                continue;
             }
 
             Console.WriteLine($@"Coping table: {table.Name}");
