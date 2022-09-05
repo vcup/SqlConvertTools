@@ -74,7 +74,7 @@ public class SqlServerToSqliteCommand : Command
             var rowCount = await mssql.Queryable<object>().AS(table.Name).CountAsync();
             if (ignoreTables.Any(tbl => tbl == table.Name))
             {
-                Console.WriteLine($"Ignore this table: {table.Name}, this will skip {rowCount} row");
+                Console.WriteLine($"Ignored table: {table.Name}, this will skip {rowCount} row\n");
                 continue;
             }
 
