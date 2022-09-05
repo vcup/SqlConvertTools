@@ -22,9 +22,8 @@ public class SqlServerToSqliteCommand : Command
             Description = "database file path of sqlite, if not specify then will use a random number",
         };
 
-        var ignoreTablesOption = new Option<string[]>(
-            "--ignore-tables",
-            "ignore the given tables, but still create them");
+        var ignoreTablesOption = new Option<string[]>
+        ("--ignore-tables", "ignore the given tables, but still create them");
 
         AddArgument(mssqlConnectStringArgument);
         AddArgument(sqliteDbFileArgument);
@@ -66,7 +65,7 @@ public class SqlServerToSqliteCommand : Command
             {
                 col.DataType = "integer"; // set datatype to integer, but sqlsugar may convert to integer(10)
                 col.Length = 0; // for remove (10) from sql
-                col.IsPrimarykey = true;
+                col.IsPrimarykey = true; // see donet5/SqlSugar#1069
             }
 
             sqlite.DbMaintenance.CreateTable(table.Name, columnInfos);
