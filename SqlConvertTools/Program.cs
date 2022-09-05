@@ -5,4 +5,4 @@ var rootCommand = new RootCommand();
 
 rootCommand.AddCommand(new SqlServerToSqliteCommand());
 
-await rootCommand.InvokeAsync(args);
+return await rootCommand.InvokeAsync(args);
