@@ -127,6 +127,25 @@ public class SqlServerTransferCommand : Command
             Console.WriteLine($"Creating Table: {table.Name}");
             Console.WriteLine($"Columns: {JsonConvert.SerializeObject(columnInfos.Select(c => c.DbColumnName))}");
 
+            foreach (var info in columnInfos)
+            {
+                switch (info.DataType)
+                {
+                    case "int":
+                    case "bit":
+                    case "date":
+                    case "datetime":
+                    case "uniqueidentifier":
+                        info.Length = 0;
+                        info.DecimalDigits = 0;
+                        break; // remove there trailing length limit, e.g. (length, decimalDigits)
+                    case "varchar":
+                    case "nvarchar":
+                        info.Length = 4001;
+                        break; // let datatype finally equal nvarchar(max)
+                }
+            }
+
             if (targetDb.DbMaintenance.IsAnyTable(table.Name, false)) targetDb.DbMaintenance.DropTable(table.Name);
             targetDb.DbMaintenance.CreateTable(table.Name, columnInfos);
 
@@ -134,10 +153,10 @@ public class SqlServerTransferCommand : Command
 
             Console.WriteLine($@"Coping table: {table.Name}");
             Console.WriteLine($"Rows Count: {rowCount}");
-            var mssqlData = await sourceDb.Queryable<object>().AS(table.Name).ToDataTableAsync();
+            var dataTable = await sourceDb.Queryable<object>().AS(table.Name).ToDataTableAsync();
             await targetDb.Fastest<object>()
                 .AS(table.Name)
-                .BulkCopyAsync(mssqlData);
+                .BulkCopyAsync(dataTable);
             Console.WriteLine();
         }
     }
