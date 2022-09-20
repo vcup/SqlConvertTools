@@ -38,14 +38,14 @@ public class SqlServerToSqliteCommand : Command
         {
             DataSource = sqliteDb?.FullName ?? $"{Random.Shared.NextInt64()}.db"
         };
-        var sqlite = new SqlSugarScope(new ConnectionConfig
+        using var sqlite = new SqlSugarClient(new ConnectionConfig
         {
             ConnectionString = sqliteConnectStringBuilder.ToString(),
             IsAutoCloseConnection = true,
             DbType = DbType.Sqlite,
             ConfigId = "sqlite"
         });
-        var mssql = new SqlSugarClient(new ConnectionConfig
+        using var mssql = new SqlSugarClient(new ConnectionConfig
         {
             ConnectionString = mssqlConnString,
             DbType = DbType.SqlServer,

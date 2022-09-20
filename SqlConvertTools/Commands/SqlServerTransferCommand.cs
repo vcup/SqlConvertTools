@@ -102,14 +102,14 @@ public class SqlServerTransferCommand : Command
 
     private static async Task TransferDatabase(string sourceConnectString, string targetConnectString)
     {
-        var sourceDb = new SqlSugarClient(new ConnectionConfig
+        using var sourceDb = new SqlSugarClient(new ConnectionConfig
         {
             ConnectionString = sourceConnectString,
             DbType = DbType.SqlServer,
             IsAutoCloseConnection = true,
             ConfigId = "source"
         });
-        var targetDb = new SqlSugarClient(new ConnectionConfig
+        using var targetDb = new SqlSugarClient(new ConnectionConfig
         {
             ConnectionString = targetConnectString,
             IsAutoCloseConnection = true,
