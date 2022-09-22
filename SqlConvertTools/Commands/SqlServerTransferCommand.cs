@@ -123,6 +123,8 @@ public class SqlServerTransferCommand : Command
             .GetTableInfoList(false);
         foreach (var table in tables)
         {
+            table.Name = $"[{table.Name}]";
+            // fix: some table name may contain .(dot), may convert to [table_name_part1].[table_name_part2]
             var columnInfos = sourceDb.DbMaintenance.GetColumnInfosByTableName(table.Name);
             Console.WriteLine($"Creating Table: {table.Name}");
             Console.WriteLine($"Columns: {JsonConvert.SerializeObject(columnInfos.Select(c => c.DbColumnName))}");
@@ -132,16 +134,26 @@ public class SqlServerTransferCommand : Command
                 switch (info.DataType)
                 {
                     case "int":
+                    case "tinyint":
+                    case "smallint":
+                    case "bigint":
                     case "bit":
                     case "date":
                     case "datetime":
+                    case "timestamp":
                     case "uniqueidentifier":
+                    case "text":
+                    case "ntext":
                         info.Length = 0;
                         info.DecimalDigits = 0;
                         break; // remove there trailing length limit, e.g. (length, decimalDigits)
                     case "varchar":
                     case "nvarchar":
-                        info.Length = 4001;
+                        if (!info.IsPrimarykey)
+                        {
+                            info.Length = 4001;
+                        }
+
                         break; // let datatype finally equal nvarchar(max)
                 }
             }
