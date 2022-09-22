@@ -25,13 +25,13 @@ public class SqlServerTransferCommand : Command
             Name = "transfer_database",
             Description = "specify database for transfer"
         };
-        var userNameOption = new Option<string?>(new[] { "--user", "-u" }, 
+        var userNameOption = new Option<string?>(new[] { "--user", "-u" },
             "specify transfer task to used user name, use --source-user or --target-user specify value for sqlserver individually. if has not available value, will use 'sa'");
         var sourceUserNameOption = new Option<string?>("--source-user",
             "specify transfer task to used user name for source sqlserver, will override --user");
         var targetUserNameOption =
             new Option<string?>("--target-user", "same as --source-user, but is for target sqlserver");
-        var passwordOption = new Option<string?>(new[] { "--password", "-p" }, 
+        var passwordOption = new Option<string?>(new[] { "--password", "-p" },
             "same as -user, but specify password. Ask user if has not available value");
         var sourcePasswordOption = new Option<string?>("--source-password",
             "same as --source-user, but specify password and override --password. Ask user if has not available value");
@@ -129,34 +129,7 @@ public class SqlServerTransferCommand : Command
             Console.WriteLine($"Creating Table: {table.Name}");
             Console.WriteLine($"Columns: {JsonConvert.SerializeObject(columnInfos.Select(c => c.DbColumnName))}");
 
-            foreach (var info in columnInfos)
-            {
-                switch (info.DataType)
-                {
-                    case "int":
-                    case "tinyint":
-                    case "smallint":
-                    case "bigint":
-                    case "bit":
-                    case "date":
-                    case "datetime":
-                    case "timestamp":
-                    case "uniqueidentifier":
-                    case "text":
-                    case "ntext":
-                        info.Length = 0;
-                        info.DecimalDigits = 0;
-                        break; // remove there trailing length limit, e.g. (length, decimalDigits)
-                    case "varchar":
-                    case "nvarchar":
-                        if (!info.IsPrimarykey)
-                        {
-                            info.Length = 4001;
-                        }
-
-                        break; // let datatype finally equal nvarchar(max)
-                }
-            }
+            ConvertDataType(columnInfos);
 
             if (targetDb.DbMaintenance.IsAnyTable(table.Name, false)) targetDb.DbMaintenance.DropTable(table.Name);
             targetDb.DbMaintenance.CreateTable(table.Name, columnInfos);
@@ -170,6 +143,38 @@ public class SqlServerTransferCommand : Command
                 .AS(table.Name)
                 .BulkCopyAsync(dataTable);
             Console.WriteLine();
+        }
+    }
+
+    private static void ConvertDataType(IEnumerable<DbColumnInfo> infos)
+    {
+        foreach (var info in infos)
+        {
+            switch (info.DataType)
+            {
+                case "int":
+                case "tinyint":
+                case "smallint":
+                case "bigint":
+                case "bit":
+                case "date":
+                case "datetime":
+                case "timestamp":
+                case "uniqueidentifier":
+                case "text":
+                case "ntext":
+                    info.Length = 0;
+                    info.DecimalDigits = 0;
+                    break; // remove there trailing length limit, e.g. (length, decimalDigits)
+                case "varchar":
+                case "nvarchar":
+                    if (!info.IsPrimarykey)
+                    {
+                        info.Length = 4001;
+                    }
+
+                    break; // let datatype finally equal nvarchar(max)
+            }
         }
     }
 }
