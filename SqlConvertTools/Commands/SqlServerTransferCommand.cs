@@ -123,6 +123,7 @@ public class SqlServerTransferCommand : Command
             .GetTableInfoList(false);
         foreach (var table in tables)
         {
+            //if (table.Name is not "") continue;
             table.Name = $"[{table.Name}]";
             // fix: some table name may contain .(dot), may convert to [table_name_part1].[table_name_part2]
             var columnInfos = sourceDb.DbMaintenance.GetColumnInfosByTableName(table.Name);
@@ -165,14 +166,14 @@ public class SqlServerTransferCommand : Command
                 case "ntext":
                     info.Length = 0;
                     info.DecimalDigits = 0;
-                    break; // remove there trailing length limit, e.g. (length, decimalDigits)
+                    break; // remove there trailing length limit, e.g. $"{info.DataType}(length, decimalDigits)"
                 case "varchar":
                 case "nvarchar":
-                    if (!info.IsPrimarykey)
+                    if (info.Length == -1)
                     {
                         info.Length = 4001;
                     }
-
+                    // for solve datatype want to MAX but doest, see https://www.donet5.com/Ask/9/16701
                     break; // let datatype finally equal nvarchar(max)
             }
         }
