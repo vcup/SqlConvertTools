@@ -38,6 +38,9 @@ public class SqlServerTransferCommand : Command
         var targetPasswordOption = new Option<string?>("--target-password",
             "same as --source-password and similar to --target-user");
 
+        var ignoreTablesOption = new Option<string[]>
+            ("--ignore-tables", "ignore the given tables, but still create them");
+
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
         AddArgument(transferDatabase);
@@ -47,6 +50,7 @@ public class SqlServerTransferCommand : Command
         AddOption(passwordOption);
         AddOption(sourcePasswordOption);
         AddOption(targetPasswordOption);
+        AddOption(ignoreTablesOption);
 
         this.SetHandler(async content =>
         {
@@ -55,14 +59,16 @@ public class SqlServerTransferCommand : Command
             await Run((string)va(sourceAddressArgument)!, (string)va(targetAddressArgument)!,
                 (string[])va(transferDatabase)!,
                 (string?)vo(userNameOption), (string?)vo(sourceUserNameOption), (string?)vo(targetUserNameOption),
-                (string?)vo(passwordOption), (string?)vo(sourcePasswordOption), (string?)vo(targetPasswordOption)
+                (string?)vo(passwordOption), (string?)vo(sourcePasswordOption), (string?)vo(targetPasswordOption),
+                vo(ignoreTablesOption) as string[] ?? Array.Empty<string>()
             );
         });
     }
 
     private static async Task Run(string sourceAddress, string targetAddress, string[] transferDatabase,
         string? userName, string? sourceUserName, string? targetUserName,
-        string? password, string? sourcePassword, string? targetPassword)
+        string? password, string? sourcePassword, string? targetPassword,
+        string[] ignoreTables)
     {
         var sourceConnStrBuilder = new SqlConnectionStringBuilder
         {
@@ -96,11 +102,12 @@ public class SqlServerTransferCommand : Command
         foreach (var dbname in transferDatabase)
         {
             sourceConnStrBuilder.InitialCatalog = targetConnStrBuilder.InitialCatalog = dbname;
-            await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString);
+            await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString, ignoreTables);
         }
     }
 
-    private static async Task TransferDatabase(string sourceConnectString, string targetConnectString)
+    private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
+        string[] ignoreTables)
     {
         using var sourceDb = new SqlSugarClient(new ConnectionConfig
         {
@@ -136,6 +143,11 @@ public class SqlServerTransferCommand : Command
             targetDb.DbMaintenance.CreateTable(table.Name, columnInfos);
 
             var rowCount = await sourceDb.Queryable<object>().AS(table.Name).CountAsync();
+            if (ignoreTables.Any(tbl => tbl == table.Name))
+            {
+                Console.WriteLine($"Ignored table: {table.Name}, this will skip {rowCount} row\n");
+                continue;
+            }
 
             Console.WriteLine($@"Coping table: {table.Name}");
             Console.WriteLine($"Rows Count: {rowCount}");
