@@ -40,6 +40,33 @@ public class SqlServerTransferCommand : Command
 
         var ignoreTablesOption = new Option<string[]>
             ("--ignore-tables", "ignore the given tables, but still create them");
+        var ignoreTablesForDatabasesOption = new Option<IReadOnlyDictionary<string, IEnumerable<string>>>(
+            "--ignore-database-tables",
+            result =>
+            {
+                var parseResult = new Dictionary<string, IEnumerable<string>>();
+                var parsingSplit = result.Tokens
+                    .Select(i => i.Value.Split(':'))
+                    .Select(i => (i[0], i[1..]));
+                foreach (var (key, value) in parsingSplit)
+                {
+                    if (parseResult.TryGetValue(key, out var list))
+                    {
+                        (list as List<string>)!.AddRange(value);
+                    }
+                    else
+                    {
+                        parseResult[key] = new List<string>(value);
+                    }
+                }
+
+                return parseResult;
+            })
+        {
+            Description = "ignore the given tables, but still create them.\n" +
+                          "example -> dbname:tblName:tblName1 => dbname: [tblName, tblName1]",
+            Arity = ArgumentArity.ZeroOrMore,
+        };
 
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
@@ -51,6 +78,7 @@ public class SqlServerTransferCommand : Command
         AddOption(sourcePasswordOption);
         AddOption(targetPasswordOption);
         AddOption(ignoreTablesOption);
+        AddOption(ignoreTablesForDatabasesOption);
 
         this.SetHandler(async content =>
         {
@@ -60,7 +88,8 @@ public class SqlServerTransferCommand : Command
                 (string[])va(transferDatabase)!,
                 (string?)vo(userNameOption), (string?)vo(sourceUserNameOption), (string?)vo(targetUserNameOption),
                 (string?)vo(passwordOption), (string?)vo(sourcePasswordOption), (string?)vo(targetPasswordOption),
-                vo(ignoreTablesOption) as string[] ?? Array.Empty<string>()
+                vo(ignoreTablesOption) as string[] ?? Array.Empty<string>(),
+                (Dictionary<string, IEnumerable<string>>)vo(ignoreTablesForDatabasesOption)!
             );
         });
     }
@@ -68,7 +97,7 @@ public class SqlServerTransferCommand : Command
     private static async Task Run(string sourceAddress, string targetAddress, string[] transferDatabase,
         string? userName, string? sourceUserName, string? targetUserName,
         string? password, string? sourcePassword, string? targetPassword,
-        string[] ignoreTables)
+        string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables)
     {
         var sourceConnStrBuilder = new SqlConnectionStringBuilder
         {
@@ -95,14 +124,22 @@ public class SqlServerTransferCommand : Command
             });
             transferDatabase =
                 (await db.SqlQueryable<dynamic>("select name from sys.databases where database_id > 4").ToArrayAsync())
-                .Select(r => (string)r.name).ToArray();
+                .Select(r => (string)r.name)
+                .ToArray();
             // db.DbMaintenance.GetDataBaseList(db); do not ignore system database
         }
 
         foreach (var dbname in transferDatabase)
         {
             sourceConnStrBuilder.InitialCatalog = targetConnStrBuilder.InitialCatalog = dbname;
-            await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString, ignoreTables);
+            IEnumerable<string> buildIgnoreTable = ignoreTables;
+            if (ignoreDatabaseTables.TryGetValue(dbname, out var item))
+            {
+                buildIgnoreTable = ignoreTables.Concat(item);
+            }
+
+            await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
+                buildIgnoreTable.ToArray());
         }
     }
 
@@ -185,6 +222,7 @@ public class SqlServerTransferCommand : Command
                     {
                         info.Length = 4001;
                     }
+
                     // for solve datatype want to MAX but doest, see https://www.donet5.com/Ask/9/16701
                     break; // let datatype finally equal nvarchar(max)
             }
