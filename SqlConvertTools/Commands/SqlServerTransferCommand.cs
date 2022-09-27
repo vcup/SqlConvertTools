@@ -89,7 +89,7 @@ public class SqlServerTransferCommand : Command
                 (string?)vo(userNameOption), (string?)vo(sourceUserNameOption), (string?)vo(targetUserNameOption),
                 (string?)vo(passwordOption), (string?)vo(sourcePasswordOption), (string?)vo(targetPasswordOption),
                 vo(ignoreTablesOption) as string[] ?? Array.Empty<string>(),
-                (Dictionary<string, IEnumerable<string>>)vo(ignoreTablesForDatabasesOption)!
+                vo(ignoreTablesForDatabasesOption) as Dictionary<string, IEnumerable<string>> ?? new Dictionary<string, IEnumerable<string>>()
             );
         });
     }
