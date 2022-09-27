@@ -68,6 +68,20 @@ public class SqlServerTransferCommand : Command
             Arity = ArgumentArity.ZeroOrMore,
         };
 
+        var customDatabaseNamesOption = new Option<IReadOnlyDictionary<string, string>>(
+            "--custom-database-names",
+            result => new Dictionary<string, string>(result.Tokens
+                .Select(i => i.Value.Split(':'))
+                .Select(i => (i[0], i[1]))
+                .Select(i => new KeyValuePair<string, string>(i.Item1, i.Item2))
+            )
+        )
+        {
+            Description = "Transfer source database as a custom name.\n" +
+                          "format -> source_name:dest_name",
+            Arity = ArgumentArity.ZeroOrMore,
+        };
+
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
         AddArgument(transferDatabase);
@@ -79,6 +93,7 @@ public class SqlServerTransferCommand : Command
         AddOption(targetPasswordOption);
         AddOption(ignoreTablesOption);
         AddOption(ignoreTablesForDatabasesOption);
+        AddOption(customDatabaseNamesOption);
 
         this.SetHandler(async content =>
         {
@@ -89,15 +104,16 @@ public class SqlServerTransferCommand : Command
                 (string?)vo(userNameOption), (string?)vo(sourceUserNameOption), (string?)vo(targetUserNameOption),
                 (string?)vo(passwordOption), (string?)vo(sourcePasswordOption), (string?)vo(targetPasswordOption),
                 vo(ignoreTablesOption) as string[] ?? Array.Empty<string>(),
-                vo(ignoreTablesForDatabasesOption) as Dictionary<string, IEnumerable<string>> ?? new Dictionary<string, IEnumerable<string>>()
-            );
+                vo(ignoreTablesForDatabasesOption) as IReadOnlyDictionary<string, IEnumerable<string>> ?? new Dictionary<string, IEnumerable<string>>(),
+                vo(customDatabaseNamesOption) as IReadOnlyDictionary<string, string> ?? new Dictionary<string, string>());
         });
     }
 
     private static async Task Run(string sourceAddress, string targetAddress, string[] transferDatabase,
         string? userName, string? sourceUserName, string? targetUserName,
         string? password, string? sourcePassword, string? targetPassword,
-        string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables)
+        string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables,
+        IReadOnlyDictionary<string, string> customDatabaseNames)
     {
         var sourceConnStrBuilder = new SqlConnectionStringBuilder
         {
@@ -132,6 +148,10 @@ public class SqlServerTransferCommand : Command
         foreach (var dbname in transferDatabase)
         {
             sourceConnStrBuilder.InitialCatalog = targetConnStrBuilder.InitialCatalog = dbname;
+            if (customDatabaseNames.TryGetValue(dbname, out var customDbName))
+            {
+                targetConnStrBuilder.InitialCatalog = customDbName;
+            }
             IEnumerable<string> buildIgnoreTable = ignoreTables;
             if (ignoreDatabaseTables.TryGetValue(dbname, out var item))
             {
