@@ -77,7 +77,7 @@ public class SqlServerTransferCommand : Command
             )
         )
         {
-            Description = "Transfer source database as a custom name.\n" +
+            Description = "Transfer source database as a custom name. Doest affect --ignore-database-tables\n" +
                           "format -> source_name:dest_name",
             Arity = ArgumentArity.ZeroOrMore,
         };
@@ -200,7 +200,7 @@ public class SqlServerTransferCommand : Command
             targetDb.DbMaintenance.CreateTable(table.Name, columnInfos);
 
             var rowCount = await sourceDb.Queryable<object>().AS(table.Name).CountAsync();
-            if (ignoreTables.Any(tbl => tbl == table.Name))
+            if (ignoreTables.Any(tbl => '[' + tbl + ']' == table.Name))
             {
                 Console.WriteLine($"Ignored table: {table.Name}, this will skip {rowCount} row\n");
                 continue;
