@@ -88,11 +88,11 @@ internal class SqlserverHandler : IDisposable
                 .InsertAfter("VALUES (", "@p0, ");
             cmd.Parameters.Insert(0, new SqlParameter("@p0", SqlDbType.Int, 0, idCol.ColumnName));
 
-            Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} ON");
             using var deleteCmd = Connection.CreateCommand();
             deleteCmd.CommandText = $"DELETE FROM {tableName} WHERE {idCol.ColumnName} = @p0";
             var delCmdParam = deleteCmd.Parameters.Add("@p0", SqlDbType.Int, 0, idCol.ColumnName)!;
 
+            Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} ON");
             var rows = dataSet.Tables[i].Rows;
             for (var j = 0; j < rows.Count; j++)
             {
