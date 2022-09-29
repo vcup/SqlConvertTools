@@ -18,7 +18,7 @@ internal class SqlserverHandler : IDisposable
             Password = password,
         };
     }
-    
+
     public SqlConnectionStringBuilder ConnectionStringBuilder { get; }
 
     private SqlConnection Connection => _connection ??= new SqlConnection(ConnectionStringBuilder.ConnectionString);
@@ -57,14 +57,12 @@ internal class SqlserverHandler : IDisposable
     public DataSet FillDatasetWithTable(string tableName, DataSet? dataSet, out int count)
     {
         dataSet ??= new DataSet();
-        using var adapter = new SqlDataAdapter();
         using var command = Connection.CreateCommand();
         command.CommandText = @$"Select * From {tableName}";
         command.CommandType = CommandType.Text;
 
-        adapter.TableMappings.Add("Table", tableName);
-        adapter.SelectCommand = command;
-        count = adapter.Fill(dataSet);
+        _adapter.SelectCommand = command;
+        count = _adapter.Fill(dataSet, tableName);
 
         return dataSet;
     }
