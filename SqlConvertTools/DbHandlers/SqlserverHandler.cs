@@ -1,3 +1,4 @@
+using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Data.SqlClient;
 using SqlConvertTools.Extensions;
@@ -51,6 +52,21 @@ internal class SqlserverHandler : IDisposable
         }
 
         Connection.ChangeDatabase(dbname);
+    }
+
+    public DataSet FillDatasetWithTable(string tableName, DataSet? dataSet, out int count)
+    {
+        dataSet ??= new DataSet();
+        using var adapter = new SqlDataAdapter();
+        using var command = Connection.CreateCommand();
+        command.CommandText = @$"Select * From {tableName}";
+        command.CommandType = CommandType.Text;
+
+        adapter.TableMappings.Add("Table", tableName);
+        adapter.SelectCommand = command;
+        count = adapter.Fill(dataSet);
+
+        return dataSet;
     }
 
     public void Dispose()
