@@ -8,9 +8,13 @@ namespace SqlConvertTools.DbHandlers;
 internal class SqlserverHandler : IDisposable
 {
     private SqlConnection? _connection;
+    private readonly SqlDataAdapter _adapter;
+    private readonly SqlCommandBuilder _commandBuilder;
 
     public SqlserverHandler(string address, string password, string user = "sa")
     {
+        _adapter = new SqlDataAdapter();
+        _commandBuilder = new SqlCommandBuilder(_adapter);
         ConnectionStringBuilder = new SqlConnectionStringBuilder
         {
             DataSource = address,
@@ -65,6 +69,45 @@ internal class SqlserverHandler : IDisposable
         count = _adapter.Fill(dataSet, tableName);
 
         return dataSet;
+    }
+
+    public void FillDatabaseWithDataset(DataSet dataSet, string? targetDb = null)
+    {
+        if (targetDb is not null)
+        {
+            ChangeDatabase(targetDb);
+        }
+
+        for (var i = 0; i < dataSet.Tables.Count; i++)
+        {
+            var tableName = dataSet.Tables[i].TableName;
+            var cmd = _commandBuilder.GetInsertCommand();
+            var idCol = dataSet.Tables[i].Columns[0];
+            cmd.CommandText = cmd.CommandText
+                .InsertAfter($"[{tableName}] (", $"[{idCol.ColumnName}], ")
+                .InsertAfter("VALUES (", "@p0, ");
+            cmd.Parameters.Insert(0, new SqlParameter("@p0", SqlDbType.Int, 0, idCol.ColumnName));
+
+            Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} ON");
+            using var deleteCmd = Connection.CreateCommand();
+            deleteCmd.CommandText = $"DELETE FROM {tableName} WHERE {idCol.ColumnName} = @p0";
+            var delCmdParam = deleteCmd.Parameters.Add("@p0", SqlDbType.Int, 0, idCol.ColumnName)!;
+
+            var rows = dataSet.Tables[i].Rows;
+            for (var j = 0; j < rows.Count; j++)
+            {
+                delCmdParam.Value = rows[j].ItemArray[0];
+                for (var k = 0; k < cmd.Parameters.Count; k++)
+                {
+                    cmd.Parameters[k].Value = rows[j].ItemArray[k];
+                }
+
+                deleteCmd.ExecuteNonQuery();
+                cmd.ExecuteNonQuery();
+            }
+
+            Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} OFF");
+        }
     }
 
     public void Dispose()
