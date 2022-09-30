@@ -20,6 +20,10 @@ internal class SqlserverHandler : IDisposable
     {
     }
 
+    public SqlserverHandler(string connectString) : this(new SqlConnectionStringBuilder(connectString))
+    {
+    }
+
     public SqlserverHandler(SqlConnectionStringBuilder connectionStringBuilder)
     {
         _adapter = new SqlDataAdapter
@@ -33,6 +37,20 @@ internal class SqlserverHandler : IDisposable
     public SqlConnectionStringBuilder ConnectionStringBuilder { get; }
 
     private SqlConnection Connection => _connection ??= new SqlConnection(ConnectionStringBuilder.ConnectionString);
+
+    public bool TryConnect()
+    {
+        try
+        {
+            Connection.Open();
+        }
+        catch
+        {
+            return false;
+        }
+
+        return true;
+    }
 
     public bool TryConnect([NotNullWhen(false)] out SqlException? exception)
     {
