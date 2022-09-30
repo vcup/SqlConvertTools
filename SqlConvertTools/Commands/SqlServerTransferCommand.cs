@@ -179,7 +179,7 @@ public class SqlServerTransferCommand : Command
             Console.Write("Columns: ");
             for (var i = 0; i < table.Columns.Count; i++)
             {
-                Console.Write('[' + table.Columns[i].ColumnName + "], ");
+                Console.Write('[' + table.Columns[i].ColumnName + ']' + ',');
             }
 
             Console.WriteLine();
