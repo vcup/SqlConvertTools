@@ -164,13 +164,16 @@ internal class SqlserverHandler : IDisposable
             var rows = table.Rows;
             for (var j = 0; j < rows.Count; j++)
             {
-                if (hasIdentity) delCmdParam.Value = rows[j].ItemArray[0];
                 for (var k = 0; k < cmd.Parameters.Count; k++)
                 {
                     cmd.Parameters[k].Value = rows[j].ItemArray[k];
                 }
 
-                if (hasIdentity) deleteCmd.ExecuteNonQuery();
+                if (hasIdentity)
+                {
+                    delCmdParam.Value = rows[j].ItemArray[0];
+                    deleteCmd.ExecuteNonQuery();
+                }
                 cmd.ExecuteNonQuery();
             }
 
