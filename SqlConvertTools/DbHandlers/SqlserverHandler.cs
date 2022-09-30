@@ -38,7 +38,7 @@ internal class SqlserverHandler : IDisposable
 
     private SqlConnection Connection => _connection ??= new SqlConnection(ConnectionStringBuilder.ConnectionString);
 
-    public bool TryConnect()
+    public bool TryConnect(bool fallback = true)
     {
         try
         {
@@ -46,13 +46,20 @@ internal class SqlserverHandler : IDisposable
         }
         catch
         {
-            return false;
+            if (fallback)
+            {
+                ConnectionStringBuilder.InitialCatalog = "master";
+                _connection!.Dispose();
+                _connection = new SqlConnection(ConnectionStringBuilder.ConnectionString);
+            }
+
+            return fallback && TryConnect(false);
         }
 
         return true;
     }
 
-    public bool TryConnect([NotNullWhen(false)] out SqlException? exception)
+    public bool TryConnect([NotNullWhen(false)] out SqlException? exception, bool fallback = true)
     {
         try
         {
@@ -61,7 +68,14 @@ internal class SqlserverHandler : IDisposable
         catch (SqlException e)
         {
             exception = e;
-            return false;
+            
+            if (fallback)
+            {
+                ConnectionStringBuilder.InitialCatalog = "master";
+                _connection!.Dispose();
+                _connection = new SqlConnection(ConnectionStringBuilder.ConnectionString);
+            }
+            return fallback && TryConnect(out exception, false);
         }
 
         exception = null;
@@ -112,7 +126,7 @@ internal class SqlserverHandler : IDisposable
     {
         using var reader = Connection
             .CreateCommand()
-            .ExecuteReader($@"Select name From sys.databases {(excludeSysDb ? "" : "Where database_id > 4")}");
+            .ExecuteReader($@"Select name From sys.databases {(excludeSysDb ? "Where database_id > 4" : "")}");
         while (reader.Read())
         {
             yield return (string)reader["name"];
@@ -144,7 +158,7 @@ internal class SqlserverHandler : IDisposable
         }
     }
 
-    public bool TryGetIdentityColumn(DataColumnCollection cols, [NotNullWhen(true)]out DataColumn? idCol)
+    public bool TryGetIdentityColumn(DataColumnCollection cols, [NotNullWhen(true)] out DataColumn? idCol)
     {
         idCol = null;
         var flag = false;
@@ -159,7 +173,7 @@ internal class SqlserverHandler : IDisposable
         return flag;
     }
 
-    public void UpdateDatabaseWith(DataTable table)
+    public int UpdateDatabaseWith(DataTable table)
     {
         var tableName = table.TableName;
 
@@ -172,8 +186,7 @@ internal class SqlserverHandler : IDisposable
             _adapter.InsertCommand = cmdBuilder.GetInsertCommand();
             _adapter.DeleteCommand = cmdBuilder.GetDeleteCommand();
             _adapter.UpdateCommand = cmdBuilder.GetUpdateCommand();
-            _adapter.Update(table);
-            return;
+            return _adapter.Update(table);
         }
 
         var cols = table.Columns;
@@ -211,15 +224,17 @@ internal class SqlserverHandler : IDisposable
         }
 
         if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} OFF");
+        return rows.Count;
     }
 
-    public void UpdateDatabaseWith(DataSet dataSet, string? targetDb = null)
+    public int UpdateDatabaseWith(DataSet dataSet, string? targetDb = null)
     {
         if (targetDb is not null)
         {
             ChangeDatabase(targetDb);
         }
 
+        var rowCount = 0;
         for (var i = 0; i < dataSet.Tables.Count; i++)
         {
             var table = dataSet.Tables[i];
@@ -228,8 +243,16 @@ internal class SqlserverHandler : IDisposable
                 CreateTable(table);
             }
 
-            UpdateDatabaseWith(table);
+            rowCount += UpdateDatabaseWith(table);
         }
+
+        return rowCount;
+    }
+
+    public int GetRowCount(string tableName)
+    {
+        return (int)Connection.CreateCommand()
+            .ExecuteScalar($"Select COUNT(1) From {tableName}");
     }
 
     public void Dispose()

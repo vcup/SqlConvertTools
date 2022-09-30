@@ -1,7 +1,8 @@
 using System.CommandLine;
+using System.Data;
 using Microsoft.Data.SqlClient;
-using Newtonsoft.Json;
-using SqlSugar;
+using SqlConvertTools.DbHandlers;
+using SqlConvertTools.Extensions;
 
 namespace SqlConvertTools.Commands;
 
@@ -95,21 +96,23 @@ public class SqlServerTransferCommand : Command
         AddOption(ignoreTablesForDatabasesOption);
         AddOption(customDatabaseNamesOption);
 
-        this.SetHandler(async content =>
+        this.SetHandler(content =>
         {
             Func<Argument, object?> va = content.ParseResult.GetValueForArgument;
             Func<Option, object?> vo = content.ParseResult.GetValueForOption;
-            await Run((string)va(sourceAddressArgument)!, (string)va(targetAddressArgument)!,
+            Run((string)va(sourceAddressArgument)!, (string)va(targetAddressArgument)!,
                 (string[])va(transferDatabase)!,
                 (string?)vo(userNameOption), (string?)vo(sourceUserNameOption), (string?)vo(targetUserNameOption),
                 (string?)vo(passwordOption), (string?)vo(sourcePasswordOption), (string?)vo(targetPasswordOption),
                 vo(ignoreTablesOption) as string[] ?? Array.Empty<string>(),
-                vo(ignoreTablesForDatabasesOption) as IReadOnlyDictionary<string, IEnumerable<string>> ?? new Dictionary<string, IEnumerable<string>>(),
-                vo(customDatabaseNamesOption) as IReadOnlyDictionary<string, string> ?? new Dictionary<string, string>());
+                vo(ignoreTablesForDatabasesOption) as IReadOnlyDictionary<string, IEnumerable<string>> ??
+                new Dictionary<string, IEnumerable<string>>(),
+                vo(customDatabaseNamesOption) as IReadOnlyDictionary<string, string> ??
+                new Dictionary<string, string>());
         });
     }
 
-    private static async Task Run(string sourceAddress, string targetAddress, string[] transferDatabase,
+    private static void Run(string sourceAddress, string targetAddress, string[] transferDatabase,
         string? userName, string? sourceUserName, string? targetUserName,
         string? password, string? sourcePassword, string? targetPassword,
         string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables,
@@ -132,17 +135,9 @@ public class SqlServerTransferCommand : Command
         if (!transferDatabase.Any())
         {
             sourceConnStrBuilder.InitialCatalog = "master";
-            var db = new SqlSugarClient(new ConnectionConfig
-            {
-                ConnectionString = sourceConnStrBuilder.ConnectionString,
-                DbType = DbType.SqlServer,
-                IsAutoCloseConnection = true
-            });
-            transferDatabase =
-                (await db.SqlQueryable<dynamic>("select name from sys.databases where database_id > 4").ToArrayAsync())
-                .Select(r => (string)r.name)
-                .ToArray();
-            // db.DbMaintenance.GetDataBaseList(db); do not ignore system database
+            using var dbHandler = new SqlserverHandler(sourceConnStrBuilder);
+            dbHandler.TryConnect();
+            transferDatabase = dbHandler.GetDatabases().ToArray();
         }
 
         foreach (var dbname in transferDatabase)
@@ -152,75 +147,65 @@ public class SqlServerTransferCommand : Command
             {
                 targetConnStrBuilder.InitialCatalog = customDbName;
             }
+
             IEnumerable<string> buildIgnoreTable = ignoreTables;
             if (ignoreDatabaseTables.TryGetValue(dbname, out var item))
             {
                 buildIgnoreTable = ignoreTables.Concat(item);
             }
 
-            await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
+            TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
                 buildIgnoreTable.ToArray());
         }
     }
 
-    private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
+    private static void TransferDatabase(string sourceConnectString, string targetConnectString,
         string[] ignoreTables)
     {
-        using var sourceDb = new SqlSugarClient(new ConnectionConfig
+        using var sourceDb = new SqlserverHandler(sourceConnectString);
+        using var targetDb = new SqlserverHandler(targetConnectString);
+
+        targetDb.TryConnect();
+        targetDb.ChangeDatabase(targetDb.ConnectionStringBuilder.InitialCatalog);
+
+        var dataSet = new DataSet();
+        
+        sourceDb.TryConnect();
+        sourceDb.FillDatasetWithoutData(dataSet);
+        foreach (DataTable table in dataSet.Tables)
         {
-            ConnectionString = sourceConnectString,
-            DbType = DbType.SqlServer,
-            IsAutoCloseConnection = true,
-            ConfigId = "source"
-        });
-        using var targetDb = new SqlSugarClient(new ConnectionConfig
-        {
-            ConnectionString = targetConnectString,
-            IsAutoCloseConnection = true,
-            DbType = DbType.SqlServer,
-            ConfigId = "target"
-        });
-
-        targetDb.DbMaintenance.CreateDatabase();
-
-        var tables = sourceDb.DbMaintenance
-            .GetTableInfoList(false);
-        foreach (var table in tables)
-        {
-            //if (table.Name is not "") continue;
-            table.Name = $"[{table.Name}]";
-            // fix: some table name may contain .(dot), may convert to [table_name_part1].[table_name_part2]
-            var columnInfos = sourceDb.DbMaintenance.GetColumnInfosByTableName(table.Name);
-            Console.WriteLine($"Creating Table: {table.Name}");
-            Console.WriteLine($"Columns: {JsonConvert.SerializeObject(columnInfos.Select(c => c.DbColumnName))}");
-
-            ConvertDataType(columnInfos);
-
-            if (targetDb.DbMaintenance.IsAnyTable(table.Name, false)) targetDb.DbMaintenance.DropTable(table.Name);
-            targetDb.DbMaintenance.CreateTable(table.Name, columnInfos);
-
-            var rowCount = await sourceDb.Queryable<object>().AS(table.Name).CountAsync();
-            if (ignoreTables.Any(tbl => '[' + tbl + ']' == table.Name))
+            //if (table.TableName is not "") continue;
+            Console.WriteLine($"Creating Table: {table.TableName}");
+            Console.Write("Columns: ");
+            for (var i = 0; i < table.Columns.Count; i++)
             {
-                Console.WriteLine($"Ignored table: {table.Name}, this will skip {rowCount} row\n");
+                Console.Write('[' + table.Columns[i].ColumnName + "], ");
+            }
+
+            Console.WriteLine();
+
+            targetDb.CreateTable(table);
+
+            if (ignoreTables.Contains(table.TableName))
+            {
+                Console.WriteLine(
+                    @$"Ignored table: {table.TableName}, this will skip {sourceDb.GetRowCount(table.TableName)} row\n");
                 continue;
             }
 
-            Console.WriteLine($@"Coping table: {table.Name}");
+            var rowCount = targetDb.UpdateDatabaseWith(table);
+
+            Console.WriteLine($@"Coping table: {table.TableName}");
             Console.WriteLine($"Rows Count: {rowCount}");
-            var dataTable = await sourceDb.Queryable<object>().AS(table.Name).ToDataTableAsync();
-            await targetDb.Fastest<object>()
-                .AS(table.Name)
-                .BulkCopyAsync(dataTable);
             Console.WriteLine();
         }
     }
 
-    private static void ConvertDataType(IEnumerable<DbColumnInfo> infos)
+    private static void ConvertDataType(IEnumerable<string> infos)
     {
         foreach (var info in infos)
         {
-            switch (info.DataType)
+            switch (info)
             {
                 case "int":
                 case "tinyint":
@@ -233,15 +218,9 @@ public class SqlServerTransferCommand : Command
                 case "uniqueidentifier":
                 case "text":
                 case "ntext":
-                    info.Length = 0;
-                    info.DecimalDigits = 0;
                     break; // remove there trailing length limit, e.g. $"{info.DataType}(length, decimalDigits)"
                 case "varchar":
                 case "nvarchar":
-                    if (info.Length == -1)
-                    {
-                        info.Length = 4001;
-                    }
 
                     // for solve datatype want to MAX but doest, see https://www.donet5.com/Ask/9/16701
                     break; // let datatype finally equal nvarchar(max)
