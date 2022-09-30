@@ -74,25 +74,13 @@ internal class SqlserverHandler : IDisposable
         return dataSet;
     }
 
-    public int FillDatasetWithDatabase(DataSet dataSet, out int rowCount)
+    public IEnumerable<string> GetTableNames()
     {
-        var tables = new List<string>();
-        using (var reader = Connection.CreateCommand().ExecuteReader(@$"SELECT name FROM sys.tables;"))
+        using var reader = Connection.CreateCommand().ExecuteReader(@$"SELECT name FROM sys.tables;");
+        while (reader.Read())
         {
-            while (reader.Read())
-            {
-                tables.Add((string)reader["name"]);
-            }
+            yield return (string)reader["name"];
         }
-
-        rowCount = 0;
-        foreach (var table in tables)
-        {
-            FillDatasetWithTable(table, dataSet, out var c);
-            rowCount += c;
-        }
-
-        return tables.Count;
     }
 
     public void CreateTable(DataTable table)
