@@ -193,6 +193,7 @@ public class SqlServerTransferCommand : Command
                 continue;
             }
 
+            sourceDb.FillDataset(table.TableName, dataSet, out _);
             var rowCount = targetDb.UpdateDatabaseWith(table);
 
             Console.WriteLine($@"Coping table: {table.TableName}");
