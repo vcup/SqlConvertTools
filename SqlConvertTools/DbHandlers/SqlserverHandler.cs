@@ -11,19 +11,23 @@ internal class SqlserverHandler : IDisposable
     private readonly SqlDataAdapter _adapter;
     private SqlCommandBuilder _commandBuilder;
 
-    public SqlserverHandler(string address, string password, string user = "sa")
+    public SqlserverHandler(string address, string password, string user = "sa") : this(new SqlConnectionStringBuilder
+    {
+        DataSource = address,
+        UserID = user,
+        Password = password
+    })
+    {
+    }
+
+    public SqlserverHandler(SqlConnectionStringBuilder connectionStringBuilder)
     {
         _adapter = new SqlDataAdapter
         {
             MissingSchemaAction = MissingSchemaAction.AddWithKey,
         };
         _commandBuilder = new SqlCommandBuilder(_adapter);
-        ConnectionStringBuilder = new SqlConnectionStringBuilder
-        {
-            DataSource = address,
-            UserID = user,
-            Password = password,
-        };
+        ConnectionStringBuilder = connectionStringBuilder;
     }
 
     public SqlConnectionStringBuilder ConnectionStringBuilder { get; }
