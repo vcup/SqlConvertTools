@@ -147,7 +147,7 @@ internal class SqlserverHandler : IDisposable
         return flag;
     }
 
-    public void UpdateDatabaseWithDataTable(DataTable table)
+    public void UpdateDatabaseWith(DataTable table)
     {
         var tableName = table.TableName;
 
@@ -201,7 +201,7 @@ internal class SqlserverHandler : IDisposable
         if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} OFF");
     }
 
-    public void UpdateDatabaseWithDataset(DataSet dataSet, string? targetDb = null)
+    public void UpdateDatabaseWith(DataSet dataSet, string? targetDb = null)
     {
         if (targetDb is not null)
         {
@@ -216,7 +216,7 @@ internal class SqlserverHandler : IDisposable
                 CreateTable(table);
             }
 
-            UpdateDatabaseWithDataTable(table);
+            UpdateDatabaseWith(table);
         }
     }
 
