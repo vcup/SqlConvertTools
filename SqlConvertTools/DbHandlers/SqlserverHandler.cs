@@ -83,7 +83,7 @@ internal class SqlserverHandler : IDisposable
         Connection.ChangeDatabase(dbname);
     }
 
-    public DataSet FillDatasetWithTable(string tableName, DataSet? dataSet, out int count)
+    public DataSet FillDataset(string tableName, DataSet? dataSet, out int count)
     {
         dataSet ??= new DataSet();
         using var command = Connection.CreateCommand();
@@ -93,6 +93,18 @@ internal class SqlserverHandler : IDisposable
         _adapter.SelectCommand = command;
         count = _adapter.Fill(dataSet, tableName);
 
+        return dataSet;
+    }
+
+    public DataSet FillDatasetWithoutData(string tableName, DataSet? dataSet)
+    {
+        dataSet ??= new DataSet();
+        using var command = Connection.CreateCommand();
+        command.CommandText = $@"Select * From {tableName}";
+        command.CommandType = CommandType.Text;
+
+        _adapter.SelectCommand = command;
+        _adapter.Fill(dataSet, int.MaxValue, 0, tableName);
         return dataSet;
     }
 

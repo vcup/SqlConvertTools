@@ -5,16 +5,26 @@ namespace SqlConvertTools.Extensions;
 
 internal static class SqlserverHandlerExtensions
 {
-    public static int FillDatasetWithDatabase(this SqlserverHandler handler, DataSet dataSet, out int rowCount)
+    public static DataSet FillDataset(this SqlserverHandler handler, DataSet dataSet, out int rowCount)
     {
-        var tables = handler.GetTableNames().ToArray();
         rowCount = 0;
-        foreach (var table in tables)
+        foreach (var table in handler.GetTableNames().ToArray())
         {
-            handler.FillDatasetWithTable(table, dataSet, out var c);
+            handler.FillDataset(table, dataSet, out var c);
             rowCount += c;
         }
 
-        return tables.Length;
+        return dataSet;
+    }
+
+    public static DataSet FillDatasetWithoutData(this SqlserverHandler handler, DataSet dataSet)
+    {
+        var tables = handler.GetTableNames().ToArray();
+        foreach (var table in tables)
+        {
+            handler.FillDatasetWithoutData(table, dataSet);
+        }
+
+        return dataSet;
     }
 }
