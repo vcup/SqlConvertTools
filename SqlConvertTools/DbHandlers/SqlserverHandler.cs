@@ -147,6 +147,60 @@ internal class SqlserverHandler : IDisposable
         return flag;
     }
 
+    public void UpdateDatabaseWithDataTable(DataTable table)
+    {
+        var tableName = table.TableName;
+
+        _adapter.SelectCommand = Connection.CreateCommand();
+        _adapter.SelectCommand.CommandText = $"SELECT * FROM {tableName}";
+        var cmdBuilder = new SqlCommandBuilder(_adapter);
+
+        if (table.PrimaryKey.Any())
+        {
+            _adapter.InsertCommand = cmdBuilder.GetInsertCommand();
+            _adapter.DeleteCommand = cmdBuilder.GetDeleteCommand();
+            _adapter.UpdateCommand = cmdBuilder.GetUpdateCommand();
+            _adapter.Update(table);
+            return;
+        }
+
+        var cols = table.Columns;
+        var hasIdentity = TryGetIdentityColumn(cols, out var idCol);
+
+        using var cmd = cmdBuilder.GetInsertCommand();
+        using var deleteCmd = Connection.CreateCommand();
+        SqlParameter delCmdParam = null!;
+        if (hasIdentity)
+        {
+            cmd.CommandText = cmd.CommandText
+                .InsertAfter($"[{tableName}] (", $"[{idCol!.ColumnName}], ")
+                .InsertAfter("VALUES (", "@p0, ");
+            cmd.Parameters.Insert(0, new SqlParameter("@p0", SqlDbType.Int, 0, idCol.ColumnName));
+            deleteCmd.CommandText = $"DELETE FROM {tableName} WHERE {idCol.ColumnName} = @p0";
+            delCmdParam = deleteCmd.Parameters.Add("@p0", SqlDbType.Int, 0, idCol.ColumnName)!;
+        }
+
+        var rows = table.Rows;
+        if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} ON");
+        for (var j = 0; j < rows.Count; j++)
+        {
+            for (var k = 0; k < cmd.Parameters.Count; k++)
+            {
+                cmd.Parameters[k].Value = rows[j].ItemArray[k];
+            }
+
+            if (hasIdentity)
+            {
+                delCmdParam.Value = rows[j].ItemArray[0];
+                deleteCmd.ExecuteNonQuery();
+            }
+
+            cmd.ExecuteNonQuery();
+        }
+
+        if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} OFF");
+    }
+
     public void UpdateDatabaseWithDataset(DataSet dataSet, string? targetDb = null)
     {
         if (targetDb is not null)
@@ -157,60 +211,12 @@ internal class SqlserverHandler : IDisposable
         for (var i = 0; i < dataSet.Tables.Count; i++)
         {
             var table = dataSet.Tables[i];
-            var tableName = table.TableName;
             if (targetDb is not null) // than try create table 
             {
                 CreateTable(table);
             }
 
-            _adapter.SelectCommand = Connection.CreateCommand();
-            _adapter.SelectCommand.CommandText = $"SELECT * FROM {tableName}";
-            _commandBuilder.Dispose();
-            _commandBuilder = new SqlCommandBuilder(_adapter);
-
-            if (table.PrimaryKey.Any())
-            {
-                _adapter.InsertCommand = _commandBuilder.GetInsertCommand();
-                _adapter.DeleteCommand = _commandBuilder.GetDeleteCommand();
-                _adapter.UpdateCommand = _commandBuilder.GetUpdateCommand();
-                _adapter.Update(dataSet, tableName);
-                continue;
-            }
-
-            var cols = table.Columns;
-            var hasIdentity = TryGetIdentityColumn(cols, out var idCol);
-
-            using var cmd = _commandBuilder.GetInsertCommand();
-            using var deleteCmd = Connection.CreateCommand();
-            SqlParameter delCmdParam = null!;
-            if (hasIdentity)
-            {
-                cmd.CommandText = cmd.CommandText
-                    .InsertAfter($"[{tableName}] (", $"[{idCol!.ColumnName}], ")
-                    .InsertAfter("VALUES (", "@p0, ");
-                cmd.Parameters.Insert(0, new SqlParameter("@p0", SqlDbType.Int, 0, idCol.ColumnName));
-                deleteCmd.CommandText = $"DELETE FROM {tableName} WHERE {idCol.ColumnName} = @p0";
-                delCmdParam = deleteCmd.Parameters.Add("@p0", SqlDbType.Int, 0, idCol.ColumnName)!;
-            }
-
-            var rows = table.Rows;
-            if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} ON");
-            for (var j = 0; j < rows.Count; j++)
-            {
-                for (var k = 0; k < cmd.Parameters.Count; k++)
-                {
-                    cmd.Parameters[k].Value = rows[j].ItemArray[k];
-                }
-
-                if (hasIdentity)
-                {
-                    delCmdParam.Value = rows[j].ItemArray[0];
-                    deleteCmd.ExecuteNonQuery();
-                }
-                cmd.ExecuteNonQuery();
-            }
-
-            if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} OFF");
+            UpdateDatabaseWithDataTable(table);
         }
     }
 
