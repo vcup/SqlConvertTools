@@ -9,11 +9,14 @@ internal class SqlserverHandler : IDisposable
 {
     private SqlConnection? _connection;
     private readonly SqlDataAdapter _adapter;
-    private readonly SqlCommandBuilder _commandBuilder;
+    private SqlCommandBuilder _commandBuilder;
 
     public SqlserverHandler(string address, string password, string user = "sa")
     {
-        _adapter = new SqlDataAdapter();
+        _adapter = new SqlDataAdapter
+        {
+            MissingSchemaAction = MissingSchemaAction.AddWithKey,
+        };
         _commandBuilder = new SqlCommandBuilder(_adapter);
         ConnectionStringBuilder = new SqlConnectionStringBuilder
         {
@@ -91,7 +94,8 @@ internal class SqlserverHandler : IDisposable
 
         return tables.Count;
     }
-    public void FillDatabaseWithDataset(DataSet dataSet, string? targetDb = null)
+
+    public void UpdateDatabaseWithDataset(DataSet dataSet, string? targetDb = null)
     {
         if (targetDb is not null)
         {
@@ -100,38 +104,84 @@ internal class SqlserverHandler : IDisposable
 
         for (var i = 0; i < dataSet.Tables.Count; i++)
         {
-            var tableName = dataSet.Tables[i].TableName;
-            var cmd = _commandBuilder.GetInsertCommand();
-            var idCol = dataSet.Tables[i].Columns[0];
-            cmd.CommandText = cmd.CommandText
-                .InsertAfter($"[{tableName}] (", $"[{idCol.ColumnName}], ")
-                .InsertAfter("VALUES (", "@p0, ");
-            cmd.Parameters.Insert(0, new SqlParameter("@p0", SqlDbType.Int, 0, idCol.ColumnName));
+            var table = dataSet.Tables[i];
+            var tableName = table.TableName;
+            if (targetDb is not null) // than try create table 
+            {
+                var exist = (int)Connection
+                    .CreateCommand()
+                    .ExecuteScalar(
+                        "IF EXISTS (" +
+                        "SELECT 1 FROM INFORMATION_SCHEMA.TABLES " +
+                        "WHERE TABLE_TYPE='BASE TABLE' AND " +
+                        $"TABLE_NAME='{tableName}'" +
+                        ") SELECT 1 ELSE SELECT 0;");
+                if (exist == 0)
+                {
+                    Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSql(table));
+                }
+            }
 
+            _adapter.SelectCommand = Connection.CreateCommand();
+            _adapter.SelectCommand.CommandText = $"SELECT * FROM {tableName}";
+            _commandBuilder.Dispose();
+            _commandBuilder = new SqlCommandBuilder(_adapter);
+
+            if (table.PrimaryKey.Any())
+            {
+                _adapter.InsertCommand = _commandBuilder.GetInsertCommand();
+                _adapter.DeleteCommand = _commandBuilder.GetDeleteCommand();
+                _adapter.UpdateCommand = _commandBuilder.GetUpdateCommand();
+                _adapter.Update(dataSet, tableName);
+                continue;
+            }
+
+            var cols = table.Columns;
+            DataColumn idCol = null!;
+            var hasIdentity = false;
+            for (var j = 0; j < cols.Count; j++)
+            {
+                if (!hasIdentity && (hasIdentity |= cols[j].AutoIncrement))
+                {
+                    idCol = cols[j];
+                }
+            }
+
+            using var cmd = _commandBuilder.GetInsertCommand();
             using var deleteCmd = Connection.CreateCommand();
-            deleteCmd.CommandText = $"DELETE FROM {tableName} WHERE {idCol.ColumnName} = @p0";
-            var delCmdParam = deleteCmd.Parameters.Add("@p0", SqlDbType.Int, 0, idCol.ColumnName)!;
+            SqlParameter delCmdParam = null!;
+            if (hasIdentity)
+            {
+                cmd.CommandText = cmd.CommandText
+                    .InsertAfter($"[{tableName}] (", $"[{idCol.ColumnName}], ")
+                    .InsertAfter("VALUES (", "@p0, ");
+                cmd.Parameters.Insert(0, new SqlParameter("@p0", SqlDbType.Int, 0, idCol.ColumnName));
+                deleteCmd.CommandText = $"DELETE FROM {tableName} WHERE {idCol.ColumnName} = @p0";
+                delCmdParam = deleteCmd.Parameters.Add("@p0", SqlDbType.Int, 0, idCol.ColumnName)!;
+            }
 
-            Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} ON");
-            var rows = dataSet.Tables[i].Rows;
+            if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} ON");
+            var rows = table.Rows;
             for (var j = 0; j < rows.Count; j++)
             {
-                delCmdParam.Value = rows[j].ItemArray[0];
+                if (hasIdentity) delCmdParam.Value = rows[j].ItemArray[0];
                 for (var k = 0; k < cmd.Parameters.Count; k++)
                 {
                     cmd.Parameters[k].Value = rows[j].ItemArray[k];
                 }
 
-                deleteCmd.ExecuteNonQuery();
+                if (hasIdentity) deleteCmd.ExecuteNonQuery();
                 cmd.ExecuteNonQuery();
             }
 
-            Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} OFF");
+            if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} OFF");
         }
     }
 
     public void Dispose()
     {
         _connection?.Dispose();
+        _adapter.Dispose();
+        _commandBuilder.Dispose();
     }
 }

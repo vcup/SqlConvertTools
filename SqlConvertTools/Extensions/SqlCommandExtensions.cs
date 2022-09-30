@@ -39,4 +39,16 @@ public static class SqlCommandExtensions
 
         return reader;
     }
+
+    public static object ExecuteScalar(this SqlCommand command, string cmdText, bool disposing = true)
+    {
+        command.CommandText = cmdText;
+        var result = command.ExecuteScalar();
+        if (disposing)
+        {
+            command.Dispose();
+        }
+
+        return result;
+    }
 }
