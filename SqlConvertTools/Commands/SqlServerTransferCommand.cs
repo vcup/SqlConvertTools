@@ -200,31 +200,4 @@ public class SqlServerTransferCommand : Command
             Console.WriteLine();
         }
     }
-
-    private static void ConvertDataType(IEnumerable<string> infos)
-    {
-        foreach (var info in infos)
-        {
-            switch (info)
-            {
-                case "int":
-                case "tinyint":
-                case "smallint":
-                case "bigint":
-                case "bit":
-                case "date":
-                case "datetime":
-                case "timestamp":
-                case "uniqueidentifier":
-                case "text":
-                case "ntext":
-                    break; // remove there trailing length limit, e.g. $"{info.DataType}(length, decimalDigits)"
-                case "varchar":
-                case "nvarchar":
-
-                    // for solve datatype want to MAX but doest, see https://www.donet5.com/Ask/9/16701
-                    break; // let datatype finally equal nvarchar(max)
-            }
-        }
-    }
 }
