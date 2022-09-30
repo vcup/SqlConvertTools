@@ -78,6 +78,17 @@ internal class SqlserverHandler : IDisposable
         return dataSet;
     }
 
+    public IEnumerable<string> GetDatabases(bool excludeSysDb = true)
+    {
+        using var reader = Connection
+            .CreateCommand()
+            .ExecuteReader($@"Select name From sys.databases {(excludeSysDb ? "" : "Where database_id > 4")}");
+        while (reader.Read())
+        {
+            yield return (string)reader["name"];
+        }
+    }
+
     public IEnumerable<string> GetTableNames()
     {
         using var reader = Connection.CreateCommand().ExecuteReader(@$"SELECT name FROM sys.tables;");
