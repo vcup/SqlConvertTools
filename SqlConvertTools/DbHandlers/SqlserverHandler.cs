@@ -95,6 +95,37 @@ internal class SqlserverHandler : IDisposable
         return tables.Count;
     }
 
+    public void CreateTable(DataTable table)
+    {
+        var exist = (int)Connection
+            .CreateCommand()
+            .ExecuteScalar(
+                "IF EXISTS (" +
+                "SELECT 1 FROM INFORMATION_SCHEMA.TABLES " +
+                "WHERE TABLE_TYPE='BASE TABLE' AND " +
+                $"TABLE_NAME='{table.TableName}'" +
+                ") SELECT 1 ELSE SELECT 0;");
+        if (exist == 0)
+        {
+            Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSql(table));
+        }
+    }
+
+    public bool TryGetIdentityColumn(DataColumnCollection cols, [NotNullWhen(true)]out DataColumn? idCol)
+    {
+        idCol = null;
+        var flag = false;
+        for (var j = 0; j < cols.Count; j++)
+        {
+            if (!flag && (flag |= cols[j].AutoIncrement))
+            {
+                idCol = cols[j];
+            }
+        }
+
+        return flag;
+    }
+
     public void UpdateDatabaseWithDataset(DataSet dataSet, string? targetDb = null)
     {
         if (targetDb is not null)
@@ -108,18 +139,7 @@ internal class SqlserverHandler : IDisposable
             var tableName = table.TableName;
             if (targetDb is not null) // than try create table 
             {
-                var exist = (int)Connection
-                    .CreateCommand()
-                    .ExecuteScalar(
-                        "IF EXISTS (" +
-                        "SELECT 1 FROM INFORMATION_SCHEMA.TABLES " +
-                        "WHERE TABLE_TYPE='BASE TABLE' AND " +
-                        $"TABLE_NAME='{tableName}'" +
-                        ") SELECT 1 ELSE SELECT 0;");
-                if (exist == 0)
-                {
-                    Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSql(table));
-                }
+                CreateTable(table);
             }
 
             _adapter.SelectCommand = Connection.CreateCommand();
@@ -137,15 +157,7 @@ internal class SqlserverHandler : IDisposable
             }
 
             var cols = table.Columns;
-            DataColumn idCol = null!;
-            var hasIdentity = false;
-            for (var j = 0; j < cols.Count; j++)
-            {
-                if (!hasIdentity && (hasIdentity |= cols[j].AutoIncrement))
-                {
-                    idCol = cols[j];
-                }
-            }
+            var hasIdentity = TryGetIdentityColumn(cols, out var idCol);
 
             using var cmd = _commandBuilder.GetInsertCommand();
             using var deleteCmd = Connection.CreateCommand();
@@ -153,15 +165,15 @@ internal class SqlserverHandler : IDisposable
             if (hasIdentity)
             {
                 cmd.CommandText = cmd.CommandText
-                    .InsertAfter($"[{tableName}] (", $"[{idCol.ColumnName}], ")
+                    .InsertAfter($"[{tableName}] (", $"[{idCol!.ColumnName}], ")
                     .InsertAfter("VALUES (", "@p0, ");
                 cmd.Parameters.Insert(0, new SqlParameter("@p0", SqlDbType.Int, 0, idCol.ColumnName));
                 deleteCmd.CommandText = $"DELETE FROM {tableName} WHERE {idCol.ColumnName} = @p0";
                 delCmdParam = deleteCmd.Parameters.Add("@p0", SqlDbType.Int, 0, idCol.ColumnName)!;
             }
 
-            if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} ON");
             var rows = table.Rows;
+            if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} ON");
             for (var j = 0; j < rows.Count; j++)
             {
                 for (var k = 0; k < cmd.Parameters.Count; k++)
