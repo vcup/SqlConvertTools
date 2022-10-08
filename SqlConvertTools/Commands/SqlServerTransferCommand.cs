@@ -193,9 +193,10 @@ public class SqlServerTransferCommand : Command
                 continue;
             }
 
+            Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName)}");
             Console.WriteLine($@"Coping table: {tableName}");
 
-            sourceDb.FillDataset(tableName, dataSet, out var rowCount);
+            sourceDb.FillDataset(tableName, dataSet, out _);
             if (table.Rows.Count is not 0)
             {
                 foreach (DataRow row in table.Rows)
@@ -203,8 +204,7 @@ public class SqlServerTransferCommand : Command
                     row.SetState(DataRowState.Added);
                 }
             }
-            rowCount = targetDb.UpdateDatabaseWith(table);
-            Console.WriteLine($"Rows Count: {rowCount}");
+            targetDb.UpdateDatabaseWith(table);
             Console.WriteLine();
         }
     }
