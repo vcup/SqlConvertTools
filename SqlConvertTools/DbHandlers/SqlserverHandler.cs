@@ -109,7 +109,7 @@ internal class SqlserverHandler : IDisposable
     {
         dataSet ??= new DataSet();
         using var command = Connection.CreateCommand();
-        command.CommandText = @$"Select * From {tableName}";
+        command.CommandText = @$"Select * From [{tableName}]";
         command.CommandType = CommandType.Text;
 
         _adapter.SelectCommand = command;
@@ -186,7 +186,7 @@ internal class SqlserverHandler : IDisposable
         var tableName = table.TableName;
 
         _adapter.SelectCommand = Connection.CreateCommand();
-        _adapter.SelectCommand.CommandText = $"SELECT * FROM {tableName}";
+        _adapter.SelectCommand.CommandText = $"SELECT * FROM [{tableName}]";
         var cmdBuilder = new SqlCommandBuilder(_adapter);
 
         if (table.PrimaryKey.Any())
@@ -209,12 +209,12 @@ internal class SqlserverHandler : IDisposable
                 .InsertAfter($"[{tableName}] (", $"[{idCol!.ColumnName}], ")
                 .InsertAfter("VALUES (", "@p0, ");
             cmd.Parameters.Insert(0, new SqlParameter("@p0", SqlDbType.Int, 0, idCol.ColumnName));
-            deleteCmd.CommandText = $"DELETE FROM {tableName} WHERE {idCol.ColumnName} = @p0";
+            deleteCmd.CommandText = $"DELETE FROM [{tableName}] WHERE [{idCol.ColumnName}] = @p0";
             delCmdParam = deleteCmd.Parameters.Add("@p0", SqlDbType.Int, 0, idCol.ColumnName)!;
         }
 
         var rows = table.Rows;
-        if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} ON");
+        if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT [{tableName}] ON");
         for (var j = 0; j < rows.Count; j++)
         {
             for (var k = 0; k < cmd.Parameters.Count; k++)
@@ -231,7 +231,7 @@ internal class SqlserverHandler : IDisposable
             cmd.ExecuteNonQuery();
         }
 
-        if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT {tableName} OFF");
+        if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT [{tableName}] OFF");
         return rows.Count;
     }
 
@@ -260,7 +260,7 @@ internal class SqlserverHandler : IDisposable
     public int GetRowCount(string tableName)
     {
         return (int)Connection.CreateCommand()
-            .ExecuteScalar($"Select COUNT(1) From {tableName}");
+            .ExecuteScalar($"Select COUNT(1) From [{tableName}]");
     }
 
     public void Dispose()
