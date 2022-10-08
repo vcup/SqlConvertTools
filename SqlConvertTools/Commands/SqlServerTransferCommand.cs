@@ -193,8 +193,8 @@ public class SqlServerTransferCommand : Command
                 continue;
             }
 
-            Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName)}");
             Console.WriteLine($@"Coping table: {tableName}");
+            Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName)}");
 
             sourceDb.FillDataset(tableName, dataSet, out _);
             if (table.Rows.Count is not 0)
