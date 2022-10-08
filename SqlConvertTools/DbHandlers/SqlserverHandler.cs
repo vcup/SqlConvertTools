@@ -122,7 +122,7 @@ internal class SqlserverHandler : IDisposable
     {
         dataSet ??= new DataSet();
         using var command = Connection.CreateCommand();
-        command.CommandText = $@"Select * From {tableName}";
+        command.CommandText = $@"Select * From [{tableName}]";
         command.CommandType = CommandType.Text;
 
         _adapter.SelectCommand = command;
