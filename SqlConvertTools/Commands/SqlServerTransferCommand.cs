@@ -169,6 +169,7 @@ public class SqlServerTransferCommand : Command
 
         var dataSet = new DataSet();
         
+        Console.WriteLine($"Try getting table infos for database: {sourceDb.ConnectionStringBuilder.InitialCatalog}");
         sourceDb.TryConnect();
         sourceDb.FillDatasetWithoutData(dataSet);
         foreach (DataTable table in dataSet.Tables)
@@ -188,7 +189,7 @@ public class SqlServerTransferCommand : Command
             if (ignoreTables.Contains(table.TableName))
             {
                 Console.WriteLine(
-                    @$"Ignored table: {table.TableName}, this will skip {sourceDb.GetRowCount(table.TableName)} row\n");
+                    $"Ignored table: {table.TableName}, this will skip {sourceDb.GetRowCount(table.TableName)} row\n");
                 continue;
             }
 
