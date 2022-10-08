@@ -173,9 +173,9 @@ public class SqlServerTransferCommand : Command
         foreach (var tableName in sourceDb.GetTableNames().ToArray())
         {
             //if (tableName is not "") continue;
+            Console.WriteLine($"Creating Table: {tableName}");
             sourceDb.FillDatasetWithoutData(tableName, dataSet);
             var table = dataSet.Tables[tableName] ?? throw new NullReferenceException();
-            Console.WriteLine($"Creating Table: {tableName}");
             Console.Write("Columns: ");
             for (var i = 0;;)
             {
