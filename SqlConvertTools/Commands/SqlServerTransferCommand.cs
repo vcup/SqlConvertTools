@@ -1,8 +1,8 @@
 using System.CommandLine;
 using System.Data;
-using System.Reflection;
 using Microsoft.Data.SqlClient;
 using SqlConvertTools.DbHandlers;
+using SqlConvertTools.Extensions;
 
 namespace SqlConvertTools.Commands;
 
@@ -198,12 +198,9 @@ public class SqlServerTransferCommand : Command
             sourceDb.FillDataset(tableName, dataSet, out var rowCount);
             if (table.Rows.Count is not 0)
             {
-                var type = typeof(DataRow);
-                var rowOldRecord = type.GetField("_oldRecord", BindingFlags.NonPublic | BindingFlags.Instance)!;
                 foreach (DataRow row in table.Rows)
                 {
-                    // set row.RowState to DataRowState.Added
-                    rowOldRecord.SetValue(row, -1);
+                    row.SetState(DataRowState.Added);
                 }
             }
             rowCount = targetDb.UpdateDatabaseWith(table);
