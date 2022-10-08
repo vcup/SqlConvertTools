@@ -46,6 +46,7 @@ internal class SqlserverHandler : IDisposable
         }
         catch
         {
+            var dbname = ConnectionStringBuilder.InitialCatalog;
             if (fallback)
             {
                 ConnectionStringBuilder.InitialCatalog = "master";
@@ -53,10 +54,17 @@ internal class SqlserverHandler : IDisposable
                 _connection = new SqlConnection(ConnectionStringBuilder.ConnectionString);
             }
 
-            return fallback && TryConnect(false);
+            return fallback && dbname is not null && TryConnect(dbname);
         }
 
         return true;
+    }
+
+    private bool TryConnect(string dbname)
+    {
+        var flag = TryConnect(false);
+        ChangeDatabase(dbname);
+        return flag;
     }
 
     public bool TryConnect([NotNullWhen(false)] out SqlException? exception, bool fallback = true)

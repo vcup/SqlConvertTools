@@ -166,7 +166,6 @@ public class SqlServerTransferCommand : Command
         using var targetDb = new SqlserverHandler(targetConnectString);
 
         targetDb.TryConnect();
-        targetDb.ChangeDatabase(targetDb.ConnectionStringBuilder.InitialCatalog);
 
         var dataSet = new DataSet();
         
