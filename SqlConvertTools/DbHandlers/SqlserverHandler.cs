@@ -9,7 +9,6 @@ internal class SqlserverHandler : IDisposable
 {
     private SqlConnection? _connection;
     private readonly SqlDataAdapter _adapter;
-    private SqlCommandBuilder _commandBuilder;
 
     public SqlserverHandler(string address, string password, string user = "sa") : this(new SqlConnectionStringBuilder
     {
@@ -30,7 +29,6 @@ internal class SqlserverHandler : IDisposable
         {
             MissingSchemaAction = MissingSchemaAction.AddWithKey,
         };
-        _commandBuilder = new SqlCommandBuilder(_adapter);
         ConnectionStringBuilder = connectionStringBuilder;
     }
 
@@ -189,14 +187,6 @@ internal class SqlserverHandler : IDisposable
         _adapter.SelectCommand.CommandText = $"SELECT * FROM [{tableName}]";
         var cmdBuilder = new SqlCommandBuilder(_adapter);
 
-        if (table.PrimaryKey.Any())
-        {
-            _adapter.InsertCommand = cmdBuilder.GetInsertCommand();
-            _adapter.DeleteCommand = cmdBuilder.GetDeleteCommand();
-            _adapter.UpdateCommand = cmdBuilder.GetUpdateCommand();
-            return _adapter.Update(table);
-        }
-
         var cols = table.Columns;
         var hasIdentity = TryGetIdentityColumn(cols, out var idCol);
 
@@ -267,6 +257,5 @@ internal class SqlserverHandler : IDisposable
     {
         _connection?.Dispose();
         _adapter.Dispose();
-        _commandBuilder.Dispose();
     }
 }
