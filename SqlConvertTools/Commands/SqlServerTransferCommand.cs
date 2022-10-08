@@ -177,9 +177,15 @@ public class SqlServerTransferCommand : Command
             var table = dataSet.Tables[tableName] ?? throw new NullReferenceException();
             Console.WriteLine($"Creating Table: {tableName}");
             Console.Write("Columns: ");
-            for (var i = 0; i < table.Columns.Count; i++)
+            for (var i = 0;;)
             {
-                Console.Write('[' + table.Columns[i].ColumnName + ']' + ',');
+                Console.Write('[' + table.Columns[i].ColumnName + ']');
+                if (++i < table.Columns.Count)
+                {
+                    Console.Write(',');
+                    continue;
+                }
+                break;
             }
 
             Console.WriteLine();
