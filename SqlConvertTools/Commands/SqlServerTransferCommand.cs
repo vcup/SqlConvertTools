@@ -168,7 +168,7 @@ public class SqlServerTransferCommand : Command
         targetDb.TryConnect();
 
         var dataSet = new DataSet();
-        
+
         sourceDb.TryConnect();
         foreach (var tableName in sourceDb.GetTableNames().ToArray())
         {
@@ -185,6 +185,7 @@ public class SqlServerTransferCommand : Command
                     Console.Write(',');
                     continue;
                 }
+
                 break;
             }
 
@@ -210,6 +211,7 @@ public class SqlServerTransferCommand : Command
                     row.SetState(DataRowState.Added);
                 }
             }
+
             targetDb.UpdateDatabaseWith(table);
             Console.WriteLine();
         }

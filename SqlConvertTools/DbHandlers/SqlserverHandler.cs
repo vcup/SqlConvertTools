@@ -124,7 +124,7 @@ internal class SqlserverHandler : IDisposable
         command.CommandType = CommandType.Text;
 
         _adapter.SelectCommand = command;
-        _adapter.Fill(dataSet, int.MaxValue, 0, tableName);
+        _adapter.FillSchema(dataSet, SchemaType.Mapped, tableName);
         return dataSet;
     }
 
@@ -214,7 +214,7 @@ internal class SqlserverHandler : IDisposable
 
             if (hasIdentity)
             {
-                delCmdParam.Value = rows[j].ItemArray[0];
+                delCmdParam.Value = rows[j][idCol!];
                 deleteCmd.ExecuteNonQuery();
             }
 
