@@ -1,8 +1,8 @@
 using System.CommandLine;
 using System.Data;
+using System.Reflection;
 using Microsoft.Data.SqlClient;
 using SqlConvertTools.DbHandlers;
-using SqlConvertTools.Extensions;
 
 namespace SqlConvertTools.Commands;
 
@@ -169,13 +169,13 @@ public class SqlServerTransferCommand : Command
 
         var dataSet = new DataSet();
         
-        Console.WriteLine($"Try getting table infos for database: {sourceDb.ConnectionStringBuilder.InitialCatalog}");
         sourceDb.TryConnect();
-        sourceDb.FillDatasetWithoutData(dataSet);
-        foreach (DataTable table in dataSet.Tables)
+        foreach (var tableName in sourceDb.GetTableNames().ToArray())
         {
-            //if (table.TableName is not "") continue;
-            Console.WriteLine($"Creating Table: {table.TableName}");
+            //if (tableName is not "") continue;
+            sourceDb.FillDatasetWithoutData(tableName, dataSet);
+            var table = dataSet.Tables[tableName] ?? throw new NullReferenceException();
+            Console.WriteLine($"Creating Table: {tableName}");
             Console.Write("Columns: ");
             for (var i = 0; i < table.Columns.Count; i++)
             {
@@ -186,17 +186,27 @@ public class SqlServerTransferCommand : Command
 
             targetDb.CreateTable(table);
 
-            if (ignoreTables.Contains(table.TableName))
+            if (ignoreTables.Contains(tableName))
             {
                 Console.WriteLine(
-                    $"Ignored table: {table.TableName}, this will skip {sourceDb.GetRowCount(table.TableName)} row\n");
+                    $"Ignored table: {tableName}, this will skip {sourceDb.GetRowCount(tableName)} row\n");
                 continue;
             }
 
-            Console.WriteLine($@"Coping table: {table.TableName}");
+            Console.WriteLine($@"Coping table: {tableName}");
 
-            sourceDb.FillDataset(table.TableName, dataSet, out _);
-            var rowCount = targetDb.UpdateDatabaseWith(table);
+            sourceDb.FillDataset(tableName, dataSet, out var rowCount);
+            if (table.Rows.Count is not 0)
+            {
+                var type = typeof(DataRow);
+                var rowOldRecord = type.GetField("_oldRecord", BindingFlags.NonPublic | BindingFlags.Instance)!;
+                foreach (DataRow row in table.Rows)
+                {
+                    // set row.RowState to DataRowState.Added
+                    rowOldRecord.SetValue(row, -1);
+                }
+            }
+            rowCount = targetDb.UpdateDatabaseWith(table);
             Console.WriteLine($"Rows Count: {rowCount}");
             Console.WriteLine();
         }
