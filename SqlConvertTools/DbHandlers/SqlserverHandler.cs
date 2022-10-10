@@ -2,6 +2,7 @@ using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Data.SqlClient;
 using SqlConvertTools.Extensions;
+using SqlConvertTools.Helper;
 
 namespace SqlConvertTools.DbHandlers;
 
@@ -173,19 +174,6 @@ internal class SqlserverHandler : IDisposable
         }
     }
 
-    public bool TryGetIdentityColumn(DataColumnCollection cols, [NotNullWhen(true)] out DataColumn? idCol)
-    {
-        idCol = null;
-        for (var j = 0; j < cols.Count; j++)
-        {
-            if (!cols[j].AutoIncrement) continue;
-            idCol = cols[j];
-            return true;
-        }
-
-        return false;
-    }
-
     public int UpdateDatabaseWith(DataTable table)
     {
         var tableName = table.TableName;
@@ -195,7 +183,7 @@ internal class SqlserverHandler : IDisposable
         var cmdBuilder = new SqlCommandBuilder(_adapter);
 
         var cols = table.Columns;
-        var hasIdentity = TryGetIdentityColumn(cols, out var idCol);
+        var hasIdentity = DbHelper.TryGetIdentityColumn(cols, out var idCol);
 
         using var cmd = cmdBuilder.GetInsertCommand();
         using var deleteCmd = Connection.CreateCommand();

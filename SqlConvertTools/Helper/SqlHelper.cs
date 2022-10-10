@@ -1,7 +1,7 @@
 using System.Data;
 using System.Text;
 
-namespace SqlConvertTools;
+namespace SqlConvertTools.Helper;
 
 public static class SqlHelper
 {

@@ -3,6 +3,7 @@ using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using MySql.Data.MySqlClient;
 using SqlConvertTools.Extensions;
+using SqlConvertTools.Helper;
 
 namespace SqlConvertTools.DbHandlers;
 
@@ -166,8 +167,8 @@ public class MysqlHandler : IDbHandler, IDisposable
         reader.Dispose();
         var sql = SqlHelper.GetCreateTableSql(table);
         sql = sql.Replace("IDENTITY(0,1)", "AUTO_INCREMENT")
-            .Replace("[", "")
-            .Replace("]", "");
+            .Replace('[', '`')
+            .Replace(']', '`');
         Connection.CreateCommand().ExecuteNonQuery(sql);
     }
 
