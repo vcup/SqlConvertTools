@@ -162,11 +162,13 @@ public class MysqlHandler : IDbHandler, IDisposable
         using var reader = Connection
             .CreateCommand()
             .ExecuteReader($"show tables where `Tables_in_{Connection.Database}` = '{table.TableName}';");
-        if (reader.HasRows)
-        {
-            reader.Dispose();
-            Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSql(table));
-        }
+        if (reader.HasRows) return;
+        reader.Dispose();
+        var sql = SqlHelper.GetCreateTableSql(table);
+        sql = sql.Replace("IDENTITY(0,1)", "AUTO_INCREMENT")
+            .Replace("[", "")
+            .Replace("]", "");
+        Connection.CreateCommand().ExecuteNonQuery(sql);
     }
 
     public int UpdateDatabaseWith(DataTable table)
