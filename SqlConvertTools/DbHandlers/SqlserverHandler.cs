@@ -42,7 +42,7 @@ internal class SqlserverHandler : IDisposable
         {
             Connection.Open();
         }
-        catch
+        catch (SqlException)
         {
             var dbname = ConnectionStringBuilder.InitialCatalog;
             if (fallback)
@@ -74,18 +74,27 @@ internal class SqlserverHandler : IDisposable
         catch (SqlException e)
         {
             exception = e;
-            
+            var dbname = ConnectionStringBuilder.InitialCatalog;
+
             if (fallback)
             {
                 ConnectionStringBuilder.InitialCatalog = "master";
                 _connection!.Dispose();
                 _connection = new SqlConnection(ConnectionStringBuilder.ConnectionString);
             }
-            return fallback && TryConnect(out exception, false);
+
+            return fallback && dbname is not null && TryConnect(out exception, dbname);
         }
 
         exception = null;
         return true;
+    }
+
+    private bool TryConnect([NotNullWhen(false)] out SqlException? exception, string dbname)
+    {
+        var flag = TryConnect(out exception, false);
+        ChangeDatabase(dbname);
+        return flag;
     }
 
     public void ChangeDatabase(string dbname)
