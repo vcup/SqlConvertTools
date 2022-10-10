@@ -6,7 +6,7 @@ using SqlConvertTools.Extensions;
 
 namespace SqlConvertTools.DbHandlers;
 
-public class MysqlHandler : IDbHandler
+public class MysqlHandler : IDbHandler, IDisposable
 {
     private MySqlConnection? _connection;
     private readonly MySqlDataAdapter _adapter;
@@ -113,12 +113,27 @@ public class MysqlHandler : IDbHandler
 
     public DataSet FillDataset(string tableName, DataSet? dataSet, out int count)
     {
-        throw new NotImplementedException();
+        dataSet ??= new DataSet();
+        using var command = Connection.CreateCommand();
+        command.CommandText = @$"Select * From [{tableName}]";
+        command.CommandType = CommandType.Text;
+
+        _adapter.SelectCommand = command;
+        count = _adapter.Fill(dataSet, tableName);
+
+        return dataSet;
     }
 
     public DataSet FillDatasetWithoutData(string tableName, DataSet? dataSet)
     {
-        throw new NotImplementedException();
+        dataSet ??= new DataSet();
+        using var command = Connection.CreateCommand();
+        command.CommandText = $@"Select * From [{tableName}]";
+        command.CommandType = CommandType.Text;
+
+        _adapter.SelectCommand = command;
+        _adapter.FillSchema(dataSet, SchemaType.Mapped, tableName);
+        return dataSet;
     }
 
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true)
@@ -160,6 +175,14 @@ public class MysqlHandler : IDbHandler
 
     public int GetRowCount(string tableName)
     {
-        throw new NotImplementedException();
+        
+        return (int)Connection.CreateCommand()
+            .ExecuteScalar($"Select COUNT(1) From [{tableName}]");
+    }
+
+    public void Dispose()
+    {
+        _connection?.Dispose();
+        _adapter.Dispose();
     }
 }
