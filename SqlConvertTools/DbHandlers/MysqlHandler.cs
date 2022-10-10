@@ -164,6 +164,7 @@ public class MysqlHandler : IDbHandler, IDisposable
             .ExecuteReader($"show tables where `Tables_in_{Connection.Database}` = '{table.TableName}';");
         if (reader.HasRows)
         {
+            reader.Dispose();
             Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSql(table));
         }
     }
