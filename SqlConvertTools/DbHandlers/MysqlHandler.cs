@@ -12,7 +12,7 @@ public class MysqlHandler : IDbHandler
     private readonly MySqlDataAdapter _adapter;
 
 
-    public MysqlHandler(string address, string password, string user = "sa") : this(new MySqlConnectionStringBuilder
+    public MysqlHandler(string address, string password, string user = "root") : this(new MySqlConnectionStringBuilder
     {
         Server = address,
         UserID = user,
@@ -47,7 +47,7 @@ public class MysqlHandler : IDbHandler
             var dbname = ConnectionStringBuilder.Database;
             if (fallback)
             {
-                ConnectionStringBuilder.Database = "master";
+                ConnectionStringBuilder.Database = "mysql";
                 _connection!.Dispose();
                 _connection = new MySqlConnection(ConnectionStringBuilder.ConnectionString);
             }
@@ -61,7 +61,7 @@ public class MysqlHandler : IDbHandler
     private bool TryConnect(string dbname)
     {
         var flag = TryConnect(false);
-        ChangeDatabase(dbname);
+        if (flag) ChangeDatabase(dbname);
         return flag;
     }
 
@@ -77,7 +77,7 @@ public class MysqlHandler : IDbHandler
             var dbname = ConnectionStringBuilder.Database;
             if (fallback)
             {
-                ConnectionStringBuilder.Database = "master";
+                ConnectionStringBuilder.Database = "mysql";
                 _connection!.Dispose();
                 _connection = new MySqlConnection(ConnectionStringBuilder.ConnectionString);
             }
@@ -92,23 +92,23 @@ public class MysqlHandler : IDbHandler
     private bool TryConnect([NotNullWhen(false)] out DbException? exception, string dbname)
     {
         var flag = TryConnect(out exception, false);
-        ChangeDatabase(dbname);
+        if (flag) ChangeDatabase(dbname);
         return flag;
     }
 
     public void ChangeDatabase(string dbname)
     {
         using (var reader = Connection.CreateCommand()
-                   .ExecuteReader(@$"Select name From sys.databases Where database_id > 4 And name = '{dbname}'"))
+                   .ExecuteReader(@$"Show Databases Where `Database` not regexp 'schema|sys|mysql' and `Database` = '{dbname}'"))
         {
-            if (dbname is not "mysql" && !reader.HasRows)
+            if (!reader.HasRows)
             {
                 reader.Dispose();
                 Connection.CreateCommand().ExecuteNonQuery($"Create Database {dbname}");
             }
         }
 
-        Connection.ChangeDatabase(dbname);
+        Connection.ChangeDatabase(ConnectionStringBuilder.Database = dbname);
     }
 
     public DataSet FillDataset(string tableName, DataSet? dataSet, out int count)
@@ -123,17 +123,34 @@ public class MysqlHandler : IDbHandler
 
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true)
     {
-        throw new NotImplementedException();
+        using var reader = Connection
+            .CreateCommand()
+            .ExecuteReader($@"Show Databases {(excludeSysDb ? "where `Database` not regexp 'schema|sys|mysql';" : "")}");
+        while (reader.Read())
+        {
+            yield return (string)reader["Database"];
+        }
     }
 
     public IEnumerable<string> GetTableNames()
     {
-        throw new NotImplementedException();
+        var key = $"Tables_in_{Connection.Database}";
+        using var reader = Connection.CreateCommand().ExecuteReader(@$"Show Tables;");
+        while (reader.Read())
+        {
+            yield return (string)reader[key];
+        }
     }
 
     public void CreateTable(DataTable table)
     {
-        throw new NotImplementedException();
+        using var reader = Connection
+            .CreateCommand()
+            .ExecuteReader($"show tables where `Tables_in_{Connection.Database}` = '{table.TableName}';");
+        if (reader.HasRows)
+        {
+            Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSql(table));
+        }
     }
 
     public int UpdateDatabaseWith(DataTable table)
