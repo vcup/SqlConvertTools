@@ -176,16 +176,14 @@ internal class SqlserverHandler : IDisposable
     public bool TryGetIdentityColumn(DataColumnCollection cols, [NotNullWhen(true)] out DataColumn? idCol)
     {
         idCol = null;
-        var flag = false;
         for (var j = 0; j < cols.Count; j++)
         {
-            if (!flag && (flag |= cols[j].AutoIncrement))
-            {
-                idCol = cols[j];
-            }
+            if (!cols[j].AutoIncrement) continue;
+            idCol = cols[j];
+            return true;
         }
 
-        return flag;
+        return false;
     }
 
     public int UpdateDatabaseWith(DataTable table)
