@@ -32,9 +32,9 @@ public class SqlServerToMySqlCommand : Command
             new Option<string?>(new[] { "--target-user", "--tu" },
                 "same as --source-user, but is for target mysql server");
         var passwordOption = new Option<string?>(new[] { "--password", "-p" },
-            "same as -user, but specify password.");
+            "same as -user, but specify password. Ask user if has not available value");
         var sourcePasswordOption = new Option<string?>(new[] { "--source-password", "--sp" },
-            "same as --source-user, but specify password and override --password.");
+            "same as --source-user, but specify password and override --password. Ask user if has not available value");
         var targetPasswordOption = new Option<string?>(new[] { "--target-password", "--tp" },
             "same as --source-password and similar to --target-user");
 
@@ -99,7 +99,8 @@ public class SqlServerToMySqlCommand : Command
             Func<Argument, object?> va = content.ParseResult.GetValueForArgument;
             Func<Option, object?> vo = content.ParseResult.GetValueForOption;
             Run((string)va(sourceAddressArgument)!, (string)va(targetAddressArgument)!,
-                (string[])va(transferDatabase)!, (string?)vo(sourceUserNameOption), (string?)vo(targetUserNameOption),
+                (string[])va(transferDatabase)!,
+                (string?)vo(sourceUserNameOption), (string?)vo(targetUserNameOption),
                 (string?)vo(passwordOption), (string?)vo(sourcePasswordOption), (string?)vo(targetPasswordOption),
                 vo(ignoreTablesOption) as string[] ?? Array.Empty<string>(),
                 vo(ignoreTablesForDatabasesOption) as IReadOnlyDictionary<string, IEnumerable<string>> ??
@@ -110,24 +111,24 @@ public class SqlServerToMySqlCommand : Command
     }
 
     private static void Run(string sourceAddress, string targetAddress, string[] transferDatabase,
-        string? userName, string? sourceUserName, string? targetUserName,
-        string? sourcePassword, string? targetPassword,
+        string? sourceUserName, string? targetUserName,
+        string? password, string? sourcePassword, string? targetPassword,
         string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables,
         IReadOnlyDictionary<string, string> customDatabaseNames)
     {
         var sourceConnStrBuilder = new SqlConnectionStringBuilder
         {
             DataSource = sourceAddress,
-            UserID = sourceUserName ?? userName ?? "sa",
-            Password = sourcePassword ??
-                       throw new ArgumentException("has not available password for source sqlserver")
+            UserID = sourceUserName ?? "sa",
+            Password = sourcePassword ?? password ??
+                throw new ArgumentException("has not available password for source sqlserver")
         };
         var targetConnStrBuilder = new MySqlConnectionStringBuilder
         {
             Server = targetAddress,
-            UserID = targetUserName ?? userName ?? "root",
-            Password = targetPassword ??
-                       throw new ArgumentException("has not available password for target sqlserver")
+            UserID = targetUserName ?? "root",
+            Password = targetPassword ?? password ??
+                throw new ArgumentException("has not available password for target sqlserver")
         };
         if (!transferDatabase.Any())
         {
