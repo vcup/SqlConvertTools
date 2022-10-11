@@ -56,6 +56,7 @@ public static class SqlHelper
                     {
                         sql.Append($@"nvarchar({table.Columns[i].MaxLength})");
                     }
+
                     break;
                 case "System.Single":
                     sql.Append("single");
@@ -80,6 +81,7 @@ public static class SqlHelper
                     {
                         sql.Append($@"nvarchar({table.Columns[i].MaxLength})");
                     }
+
                     break;
             }
 
@@ -182,10 +184,11 @@ public static class SqlHelper
             sql.Append($" {NetTypeMapToMySqlDataType(column)} ");
             if (column.AutoIncrement) sql.Append("AUTO_INCREMENT ");
             if (column.AutoIncrementSeed is not 0) sql.Append($"= {column.AutoIncrementSeed}");
-            if (!column.AllowDBNull && column.DefaultValue is not {})
+            if (!column.AllowDBNull && column.DefaultValue is not { })
             {
                 sql.Append($"DEFAULT {column.DefaultValue}");
             }
+
             sql.Append(column.AllowDBNull ? "DEFAULT NULL" : "NOT NULL");
 
             sql.Append(",\n");
@@ -211,43 +214,43 @@ public static class SqlHelper
         sql.AppendLine("\n) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;");
 
         return sql.ToString();
-    }
 
-    private static string NetTypeMapToMySqlDataType(DataColumn column)
-    {
-        switch (column.DataType.FullName)
+        string NetTypeMapToMySqlDataType(DataColumn column)
         {
-            case "System.Boolean":
-                return "boolean";
-            case "System.Byte":
-                return "tinyint unsigned";
-            case "System.Byte[]":
-                return "binary";
-            case "System.DateTime":
-            case "System.DateTimeOffset":
-                return "datetime";
-            case "System.Decimal":
-                return "decimal";
-            case "System.Double":
-                return "double";
-            case "System.Guid":
-                return "char(36)";
-            case "System.Int16":
-                return "smallint";
-            case "System.Int32":
-                return "int";
-            case "System.Int64":
-                return "bigint";
-            case "System.SByte":
-                return "tinyint";
-            case "System.Single":
-                return "float";
-            case "System.String":
-                return column.MaxLength is > 4000 or -1 ? "longtext": $"nvarchar({column.MaxLength})";
-            case "System.TimeSpan":
-                return "time";
-            default:
-                throw new ArgumentOutOfRangeException();
+            switch (column.DataType.FullName)
+            {
+                case "System.Boolean":
+                    return "boolean";
+                case "System.Byte":
+                    return "tinyint unsigned";
+                case "System.Byte[]":
+                    return "binary";
+                case "System.DateTime":
+                case "System.DateTimeOffset":
+                    return "datetime";
+                case "System.Decimal":
+                    return "decimal";
+                case "System.Double":
+                    return "double";
+                case "System.Guid":
+                    return "char(36)";
+                case "System.Int16":
+                    return "smallint";
+                case "System.Int32":
+                    return "int";
+                case "System.Int64":
+                    return "bigint";
+                case "System.SByte":
+                    return "tinyint";
+                case "System.Single":
+                    return "float";
+                case "System.String":
+                    return column.MaxLength is > 4000 or -1 ? "longtext" : $"varchar({column.MaxLength})";
+                case "System.TimeSpan":
+                    return "time";
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
     }
 }
