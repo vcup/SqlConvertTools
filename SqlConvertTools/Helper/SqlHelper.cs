@@ -12,7 +12,7 @@ public static class SqlHelper
     /// </summary>
     /// <param name="table">System.Data.DataTable object to be inspected for building the SQL CREATE TABLE statement.</param>
     /// <returns>String of SQL</returns>
-    public static string GetCreateTableSql(DataTable table)
+    public static string GetCreateTableSqlForSqlserver(DataTable table)
     {
         var sql = new StringBuilder();
         var alterSql = new StringBuilder();
@@ -169,5 +169,85 @@ public static class SqlHelper
         sql.Append("\n);\n");
 
         return sql.ToString();
+    }
+
+    public static string GetCreateTableSqlForMySql(DataTable table)
+    {
+        var sql = new StringBuilder($"Create Table `{table.TableName}` (");
+        sql.Append('\n');
+
+        foreach (DataColumn column in table.Columns)
+        {
+            sql.Append($"\t`{column.ColumnName}`");
+            sql.Append($" {NetTypeMapToMySqlDataType(column)} ");
+            if (column.AutoIncrement) sql.Append("AUTO_INCREMENT ");
+            if (column.AutoIncrementSeed is not 0) sql.Append($"= {column.AutoIncrementSeed}");
+            if (!column.AllowDBNull && column.DefaultValue is not {})
+            {
+                sql.Append($"DEFAULT {column.DefaultValue}");
+            }
+            sql.Append(column.AllowDBNull ? "DEFAULT NULL" : "NOT NULL");
+
+            sql.Append(",\n");
+        }
+
+        if (table.PrimaryKey.Any())
+        {
+            sql.Append($"\n\tCONSTRAINT PK_{table.TableName} PRIMARY KEY (");
+
+            foreach (var t in table.PrimaryKey)
+            {
+                sql.Append($"{t.ColumnName},");
+            }
+
+            sql.Remove(sql.Length - 1, 1);
+            sql.Append(')');
+        }
+        else
+        {
+            sql.Remove(sql.Length - 2, 1);
+        }
+
+        sql.AppendLine("\n);");
+
+        return sql.ToString();
+    }
+
+    private static string NetTypeMapToMySqlDataType(DataColumn column)
+    {
+        switch (column.DataType.FullName)
+        {
+            case "System.Boolean":
+                return "boolean";
+            case "System.Byte":
+                return "tinyint unsigned";
+            case "System.Byte[]":
+                return "binary";
+            case "System.DateTime":
+            case "System.DateTimeOffset":
+                return "datetime";
+            case "System.Decimal":
+                return "decimal";
+            case "System.Double":
+                return "double";
+            case "System.Guid":
+                return "char(36)";
+            case "System.Int16":
+                return "smallint";
+            case "System.Int32":
+                return "int";
+            case "System.Int64":
+                return "bigint";
+            case "System.SByte":
+                return "tinyint";
+            case "System.Single":
+                return "float";
+            case "System.String":
+                return column.MaxLength is > 4000 or -1 ? "longtext": $"nvarchar({column.MaxLength})";
+            case "System.TimeSpan":
+                return "time";
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
     }
 }

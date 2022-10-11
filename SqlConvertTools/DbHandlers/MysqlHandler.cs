@@ -165,16 +165,51 @@ public class MysqlHandler : IDbHandler, IDisposable
             .ExecuteReader($"show tables where `Tables_in_{Connection.Database}` = '{table.TableName}';");
         if (reader.HasRows) return;
         reader.Dispose();
-        var sql = SqlHelper.GetCreateTableSql(table);
-        sql = sql.Replace("IDENTITY(0,1)", "AUTO_INCREMENT")
-            .Replace('[', '`')
-            .Replace(']', '`');
-        Connection.CreateCommand().ExecuteNonQuery(sql);
+        Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSqlForMySql(table));
     }
 
     public int UpdateDatabaseWith(DataTable table)
     {
-        throw new NotImplementedException();
+        var tableName = table.TableName;
+
+        _adapter.SelectCommand = Connection.CreateCommand();
+        _adapter.SelectCommand.CommandText = $"SELECT * FROM `{tableName}`";
+        var cmdBuilder = new MySqlCommandBuilder(_adapter);
+
+        var cols = table.Columns;
+        var hasIdentity = DbHelper.TryGetIdentityColumn(cols, out var idCol);
+
+        using var cmd = cmdBuilder.GetInsertCommand();
+        using var deleteCmd = Connection.CreateCommand();
+        MySqlParameter delCmdParam = null!;
+        if (hasIdentity)
+        {
+            cmd.CommandText = cmd.CommandText
+                .InsertAfter($"`{tableName}` (", $"`{idCol!.ColumnName}`, ", StringComparison.OrdinalIgnoreCase)
+                .InsertAfter("VALUES (", "@p0, ", StringComparison.OrdinalIgnoreCase);
+            cmd.Parameters.Insert(0, new MySqlParameter("@p0", MySqlDbType.Int32, 0, idCol.ColumnName));
+            deleteCmd.CommandText = $"DELETE FROM `{tableName}` WHERE `{idCol.ColumnName}` = @p0";
+            delCmdParam = deleteCmd.Parameters.Add("@p0", MySqlDbType.Int32, 0, idCol.ColumnName)!;
+        }
+
+        var rows = table.Rows;
+        for (var j = 0; j < rows.Count; j++)
+        {
+            for (var k = 0; k < cmd.Parameters.Count; k++)
+            {
+                cmd.Parameters[k].Value = rows[j].ItemArray[k];
+            }
+
+            if (hasIdentity)
+            {
+                delCmdParam.Value = rows[j][idCol!];
+                deleteCmd.ExecuteNonQuery();
+            }
+
+            cmd.ExecuteNonQuery();
+        }
+
+        return rows.Count;
     }
 
     public int GetRowCount(string tableName)

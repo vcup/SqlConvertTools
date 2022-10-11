@@ -170,7 +170,7 @@ internal class SqlserverHandler : IDisposable
                 ") SELECT 1 ELSE SELECT 0;");
         if (exist == 0)
         {
-            Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSql(table));
+            Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSqlForSqlserver(table));
         }
     }
 
