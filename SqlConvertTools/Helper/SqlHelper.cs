@@ -208,7 +208,7 @@ public static class SqlHelper
             sql.Remove(sql.Length - 2, 1);
         }
 
-        sql.AppendLine("\n) CHARACTER SET utf8mb4;");
+        sql.AppendLine("\n) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;");
 
         return sql.ToString();
     }
