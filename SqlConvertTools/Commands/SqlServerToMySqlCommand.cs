@@ -202,13 +202,6 @@ public class SqlServerToMySqlCommand : Command
             Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName)}");
 
             sourceDb.FillDataset(tableName, dataSet, out _);
-            if (table.Rows.Count is not 0)
-            {
-                foreach (DataRow row in table.Rows)
-                {
-                    row.SetState(DataRowState.Added);
-                }
-            }
 
             targetDb.UpdateDatabaseWith(table);
             Console.WriteLine();
