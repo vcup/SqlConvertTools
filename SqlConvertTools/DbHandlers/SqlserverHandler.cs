@@ -62,7 +62,7 @@ internal class SqlserverHandler : IDisposable
     private bool TryConnect(string dbname)
     {
         var flag = TryConnect(false);
-        ChangeDatabase(dbname);
+        if (flag) ChangeDatabase(dbname);
         return flag;
     }
 
@@ -94,7 +94,7 @@ internal class SqlserverHandler : IDisposable
     private bool TryConnect([NotNullWhen(false)] out SqlException? exception, string dbname)
     {
         var flag = TryConnect(out exception, false);
-        ChangeDatabase(dbname);
+        if (flag) ChangeDatabase(dbname);
         return flag;
     }
 
