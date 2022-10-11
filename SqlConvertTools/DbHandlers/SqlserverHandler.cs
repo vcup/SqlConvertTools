@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Data.SqlClient;
 using SqlConvertTools.Extensions;
@@ -6,7 +7,7 @@ using SqlConvertTools.Helper;
 
 namespace SqlConvertTools.DbHandlers;
 
-internal class SqlserverHandler : IDisposable
+internal class SqlserverHandler : IDbHandler, IDisposable
 {
     private SqlConnection? _connection;
     private readonly SqlDataAdapter _adapter;
@@ -34,6 +35,7 @@ internal class SqlserverHandler : IDisposable
     }
 
     public SqlConnectionStringBuilder ConnectionStringBuilder { get; }
+    DbConnectionStringBuilder IDbHandler.ConnectionStringBuilder => ConnectionStringBuilder;
 
     private SqlConnection Connection => _connection ??= new SqlConnection(ConnectionStringBuilder.ConnectionString);
 
@@ -66,7 +68,7 @@ internal class SqlserverHandler : IDisposable
         return flag;
     }
 
-    public bool TryConnect([NotNullWhen(false)] out SqlException? exception, bool fallback = true)
+    public bool TryConnect([NotNullWhen(false)] out DbException? exception, bool fallback = true)
     {
         try
         {
@@ -91,7 +93,7 @@ internal class SqlserverHandler : IDisposable
         return true;
     }
 
-    private bool TryConnect([NotNullWhen(false)] out SqlException? exception, string dbname)
+    private bool TryConnect([NotNullWhen(false)] out DbException? exception, string dbname)
     {
         var flag = TryConnect(out exception, false);
         if (flag) ChangeDatabase(dbname);
