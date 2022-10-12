@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.CommandLine;
 using System.Data;
 using Microsoft.Data.SqlClient;
@@ -152,27 +153,23 @@ public class SqlServerToMySqlCommand : Command
             }
 
             TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
-                buildIgnoreTable.ToArray());
+                buildIgnoreTable.ToArray()).Wait();
         }
     }
 
-    private static void TransferDatabase(string sourceConnectString, string targetConnectString,
+    private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
         string[] ignoreTables)
     {
         using var sourceDb = new SqlserverHandler(sourceConnectString);
         using var targetDb = new MysqlHandler(targetConnectString);
+        using var targetDb4 = new MysqlHandler(targetConnectString);
+        targetDb4.TryConnect();
 
-        targetDb.TryConnect();
-
-        var dataSet = new DataSet();
-
-        sourceDb.TryConnect();
-        foreach (var tableName in sourceDb.GetTableNames().ToArray())
+        sourceDb.BeforeFillNewTable += table =>
         {
+            var tableName = table.TableName;
             //if (tableName is not "") continue;
             Console.WriteLine($"Creating Table: {tableName}");
-            sourceDb.FillSchema(tableName, dataSet);
-            var table = dataSet.Tables[tableName] ?? throw new NullReferenceException();
             Console.Write("Columns: ");
             for (var i = 0;;)
             {
@@ -188,22 +185,34 @@ public class SqlServerToMySqlCommand : Command
 
             Console.WriteLine();
 
-            targetDb.CreateTable(table);
+            // ReSharper disable once AccessToDisposedClosure
+            targetDb4.CreateTable(table);
 
             if (ignoreTables.Contains(tableName))
             {
-                Console.WriteLine(
-                    $"Ignored table: {tableName}, this will skip {sourceDb.GetRowCount(tableName)} row\n");
-                continue;
+                Console.WriteLine($"Ignored table: {tableName}, " +
+                                  // ReSharper disable once AccessToDisposedClosure
+                                  $"this will skip {sourceDb.GetRowCount(tableName)} row\n");
+                return true;
             }
 
-            Console.WriteLine($@"Coping table: {tableName}");
+            Console.WriteLine($@"Coping table: {table.TableName}");
+            // ReSharper disable once AccessToDisposedClosure
             Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName)}");
 
-            sourceDb.FillDataset(tableName, dataSet, out _);
-
-            targetDb.UpdateDatabaseWith(table);
             Console.WriteLine();
-        }
+
+            return false;
+        };
+
+        var queue = new ConcurrentQueue<DataRow>();
+        var tokenSource = new CancellationTokenSource();
+        sourceDb.TryConnect();
+        targetDb.TryConnect();
+        var fillTask = sourceDb.FillQueueAsync(queue, sourceDb.GetTableNames().ToArray(), tokenSource.Token);
+        var peekTask = targetDb.PeekQueueAsync(queue, tokenSource.Token, CancellationToken.None);
+        Task.WaitAny(fillTask, peekTask);
+        tokenSource.Cancel();
+        Task.WaitAll(fillTask, peekTask);
     }
 }

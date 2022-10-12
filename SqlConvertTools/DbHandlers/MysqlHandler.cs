@@ -133,6 +133,9 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
         {
             var table = new DataTable(tblName);
             FillSchema(table);
+            var reject = BeforeFillNewTable?.Invoke(table);
+            if (reject.HasValue && reject.Value) continue;
+
             await using var reader = command.ExecuteReader($@"SELECT * FROM `{tblName}`");
             var colCount = reader.FieldCount;
             var items = new object?[colCount];
@@ -149,27 +152,33 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
         }
     }
 
-    public Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token, CancellationToken forceToken)
+    public async Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token, CancellationToken forceToken)
     {
         var tableName = string.Empty;
-        using var cmdBuilder = new MySqlCommandBuilder();
+        var cmdBuilder = new MySqlCommandBuilder(_adapter);
         MySqlCommand cmd = null!;
         var delCmd = Connection.CreateCommand();
         MySqlParameter delParameter = null!;
 
         var hasIdentity = false;
         DataColumn? idCol = null;
-        while (forceToken.IsCancellationRequested)
+        while (!forceToken.IsCancellationRequested)
         {
-            if (queue.IsEmpty && token.IsCancellationRequested) return Task.CompletedTask;
-            if (!queue.TryDequeue(out var row)) continue;
+            if (queue.IsEmpty && token.IsCancellationRequested) return;
+            if (!queue.TryDequeue(out var row))
+            {
+                await Task.Delay(300, token);
+                continue;
+            }
             // init think for new Table
             if (tableName != row.Table.TableName)
             {
                 var table = row.Table;
                 tableName = table.TableName;
-                cmdBuilder.DataAdapter.SelectCommand = Connection.CreateCommand();
-                cmdBuilder.DataAdapter.SelectCommand.CommandText = $@"SELECT * FROM `{tableName}`";
+                _adapter.SelectCommand = Connection.CreateCommand();
+                _adapter.SelectCommand.CommandText = $@"SELECT * FROM `{tableName}`";
+                cmdBuilder.Dispose();
+                cmdBuilder = new MySqlCommandBuilder(_adapter);
                 cmd = cmdBuilder.GetInsertCommand();
                 // ReSharper disable once AssignmentInConditionalExpression
                 if (hasIdentity = DbHelper.TryGetIdentityColumn(table.Columns, out idCol))
@@ -179,6 +188,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
                         .InsertAfter("VALUES (", "@p0, ", StringComparison.OrdinalIgnoreCase);
                     cmd.Parameters.Insert(0, new MySqlParameter("@p0", MySqlDbType.Int32, 0, idCol.ColumnName));
                     delCmd.CommandText = $@"DELETE FROM `{tableName}` WHERE `{idCol.ColumnName}` = @p0";
+                    delCmd.Parameters.Clear();
                     delParameter = delCmd.Parameters.Add("@p0", MySqlDbType.Int32, 0, idCol.ColumnName);
                 }
             }
@@ -197,8 +207,10 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
             cmd.ExecuteNonQuery();
         }
         
-        return forceToken.IsCancellationRequested ? Task.FromCanceled(forceToken) : Task.CompletedTask;
+        //return forceToken.IsCancellationRequested ? Task.FromCanceled(forceToken) : Task.CompletedTask;
     }
+
+    public event Func<DataTable, bool>? BeforeFillNewTable;
 
     public DataSet FillSchema(string tableName, DataSet? dataSet)
     {

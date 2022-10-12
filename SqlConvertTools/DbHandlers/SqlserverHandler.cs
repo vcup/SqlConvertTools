@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Microsoft.Data.SqlClient;
 using SqlConvertTools.Extensions;
 using SqlConvertTools.Helper;
@@ -136,11 +137,14 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposa
         {
             var table = new DataTable(tblName);
             FillSchema(table);
+            var reject = BeforeFillNewTable?.Invoke(table);
+            if (reject.HasValue && reject.Value) continue;
+
             await using var reader = command.ExecuteReader($@"SELECT * FROM [{tblName}]");
             var colCount = reader.FieldCount;
             var items = new object?[colCount];
 
-            while (reader.Read() && !token.IsCancellationRequested)
+            while (await reader.ReadAsync(token) && !token.IsCancellationRequested)
             {
                 for (var j = 0; j < colCount;)
                 {
@@ -202,6 +206,8 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposa
 
         return forceToken.IsCancellationRequested ? Task.FromCanceled(forceToken) : Task.CompletedTask;
     }
+
+    public event Func<DataTable, bool>? BeforeFillNewTable;
 
     public DataSet FillSchema(string tableName, DataSet? dataSet)
     {
