@@ -16,7 +16,10 @@ public interface IDbHandler
     public void ChangeDatabase(string dbname);
 
     public DataSet FillDataset(string tableName, DataSet? dataSet, out int count);
+
     public Task FillQueueAsync(ConcurrentQueue<DataRow> queue, IEnumerable<string> tables, CancellationToken token);
+
+    public Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token, CancellationToken forceToken);
 
     public DataSet FillSchema(string tableName, DataSet? dataSet);
 

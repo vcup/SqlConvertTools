@@ -149,6 +149,57 @@ public class MysqlHandler : IDbHandler, IDisposable
         }
     }
 
+    public Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token, CancellationToken forceToken)
+    {
+        var tableName = string.Empty;
+        using var cmdBuilder = new MySqlCommandBuilder();
+        MySqlCommand cmd = null!;
+        var delCmd = Connection.CreateCommand();
+        MySqlParameter delParameter = null!;
+
+        var hasIdentity = false;
+        DataColumn? idCol = null;
+        while (forceToken.IsCancellationRequested)
+        {
+            if (queue.IsEmpty && token.IsCancellationRequested) return Task.CompletedTask;
+            if (!queue.TryDequeue(out var row)) continue;
+            // init think for new Table
+            if (tableName != row.Table.TableName)
+            {
+                var table = row.Table;
+                tableName = table.TableName;
+                cmdBuilder.DataAdapter.SelectCommand = Connection.CreateCommand();
+                cmdBuilder.DataAdapter.SelectCommand.CommandText = $@"SELECT * FROM `{tableName}`";
+                cmd = cmdBuilder.GetInsertCommand();
+                // ReSharper disable once AssignmentInConditionalExpression
+                if (hasIdentity = DbHelper.TryGetIdentityColumn(table.Columns, out idCol))
+                {
+                    cmd.CommandText = cmd.CommandText
+                        .InsertAfter($"`{tableName}` (", $"`{idCol!.ColumnName}`, ", StringComparison.OrdinalIgnoreCase)
+                        .InsertAfter("VALUES (", "@p0, ", StringComparison.OrdinalIgnoreCase);
+                    cmd.Parameters.Insert(0, new MySqlParameter("@p0", MySqlDbType.Int32, 0, idCol.ColumnName));
+                    delCmd.CommandText = $@"DELETE FROM `{tableName}` WHERE `{idCol.ColumnName}` = @p0";
+                    delParameter = delCmd.Parameters.Add("@p0", MySqlDbType.Int32, 0, idCol.ColumnName);
+                }
+            }
+
+            for (var i = 0; i < cmd.Parameters.Count; i++)
+            {
+                cmd.Parameters[i].Value = row.ItemArray[i];
+            }
+
+            if (hasIdentity)
+            {
+                delParameter.Value = row[idCol!];
+                delCmd.ExecuteNonQuery();
+            }
+
+            cmd.ExecuteNonQuery();
+        }
+        
+        return forceToken.IsCancellationRequested ? Task.FromCanceled(forceToken) : Task.CompletedTask;
+    }
+
     public DataSet FillSchema(string tableName, DataSet? dataSet)
     {
         dataSet ??= new DataSet();
