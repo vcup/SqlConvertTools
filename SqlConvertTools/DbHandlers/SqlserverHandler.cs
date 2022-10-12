@@ -140,6 +140,16 @@ internal class SqlserverHandler : IDbHandler, IDisposable
         return dataSet;
     }
 
+    public void FillSchema(DataTable table)
+    {
+        using var command = Connection.CreateCommand();
+        command.CommandText = $@"Select * From [{table.TableName}]";
+        command.CommandType = CommandType.Text;
+
+        _adapter.SelectCommand = command;
+        _adapter.FillSchema(table, SchemaType.Mapped);
+    }
+
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true)
     {
         using var reader = Connection

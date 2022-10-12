@@ -18,6 +18,8 @@ public interface IDbHandler
 
     public DataSet FillSchema(string tableName, DataSet? dataSet);
 
+    public void FillSchema(DataTable table);
+
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true);
 
     public IEnumerable<string> GetTableNames();
