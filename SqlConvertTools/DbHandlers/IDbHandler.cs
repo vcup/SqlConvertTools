@@ -16,7 +16,7 @@ public interface IDbHandler
 
     public DataSet FillDataset(string tableName, DataSet? dataSet, out int count);
 
-    public DataSet FillDatasetWithoutData(string tableName, DataSet? dataSet);
+    public DataSet FillSchema(string tableName, DataSet? dataSet);
 
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true);
 

@@ -125,7 +125,7 @@ public class MysqlHandler : IDbHandler, IDisposable
         return dataSet;
     }
 
-    public DataSet FillDatasetWithoutData(string tableName, DataSet? dataSet)
+    public DataSet FillSchema(string tableName, DataSet? dataSet)
     {
         dataSet ??= new DataSet();
         using var command = Connection.CreateCommand();
@@ -135,6 +135,16 @@ public class MysqlHandler : IDbHandler, IDisposable
         _adapter.SelectCommand = command;
         _adapter.FillSchema(dataSet, SchemaType.Mapped, tableName);
         return dataSet;
+    }
+
+    public void FillSchema(DataTable table)
+    {
+        using var command = Connection.CreateCommand();
+        command.CommandText = $@"Select * From `{table.TableName}`";
+        command.CommandType = CommandType.Text;
+
+        _adapter.SelectCommand = command;
+        _adapter.FillSchema(table, SchemaType.Mapped);
     }
 
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true)

@@ -22,7 +22,7 @@ internal static class SqlserverHandlerExtensions
         var tables = handler.GetTableNames().ToArray();
         foreach (var table in tables)
         {
-            handler.FillDatasetWithoutData(table, dataSet);
+            handler.FillSchema(table, dataSet);
         }
 
         return dataSet;

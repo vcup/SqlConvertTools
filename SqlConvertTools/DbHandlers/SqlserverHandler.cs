@@ -128,7 +128,7 @@ internal class SqlserverHandler : IDbHandler, IDisposable
         return dataSet;
     }
 
-    public DataSet FillDatasetWithoutData(string tableName, DataSet? dataSet)
+    public DataSet FillSchema(string tableName, DataSet? dataSet)
     {
         dataSet ??= new DataSet();
         using var command = Connection.CreateCommand();

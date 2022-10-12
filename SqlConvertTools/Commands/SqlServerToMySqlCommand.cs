@@ -3,7 +3,6 @@ using System.Data;
 using Microsoft.Data.SqlClient;
 using MySql.Data.MySqlClient;
 using SqlConvertTools.DbHandlers;
-using SqlConvertTools.Extensions;
 
 namespace SqlConvertTools.Commands;
 
@@ -172,7 +171,7 @@ public class SqlServerToMySqlCommand : Command
         {
             //if (tableName is not "") continue;
             Console.WriteLine($"Creating Table: {tableName}");
-            sourceDb.FillDatasetWithoutData(tableName, dataSet);
+            sourceDb.FillSchema(tableName, dataSet);
             var table = dataSet.Tables[tableName] ?? throw new NullReferenceException();
             Console.Write("Columns: ");
             for (var i = 0;;)
