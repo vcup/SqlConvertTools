@@ -3,6 +3,7 @@ using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using MySql.Data.MySqlClient;
+using Newtonsoft.Json;
 using SqlConvertTools.Extensions;
 using SqlConvertTools.Helper;
 
@@ -157,13 +158,10 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
         var tableName = string.Empty;
         var cmdBuilder = new MySqlCommandBuilder(_adapter);
         MySqlCommand cmd = null!;
-        var delCmd = Connection.CreateCommand();
-        MySqlParameter delParameter = null!;
 
-        var hasIdentity = false;
-        DataColumn? idCol = null;
         while (!forceToken.IsCancellationRequested)
         {
+            var entry = DateTime.Now;
             if (queue.IsEmpty && token.IsCancellationRequested) return;
             if (!queue.TryDequeue(out var row))
             {
@@ -180,28 +178,18 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
                 cmdBuilder.Dispose();
                 cmdBuilder = new MySqlCommandBuilder(_adapter);
                 cmd = cmdBuilder.GetInsertCommand();
-                // ReSharper disable once AssignmentInConditionalExpression
-                if (hasIdentity = DbHelper.TryGetIdentityColumn(table.Columns, out idCol))
+                if (DbHelper.TryGetIdentityColumn(table.Columns, out var idCol))
                 {
                     cmd.CommandText = cmd.CommandText
                         .InsertAfter($"`{tableName}` (", $"`{idCol!.ColumnName}`, ", StringComparison.OrdinalIgnoreCase)
                         .InsertAfter("VALUES (", "@p0, ", StringComparison.OrdinalIgnoreCase);
                     cmd.Parameters.Insert(0, new MySqlParameter("@p0", MySqlDbType.Int32, 0, idCol.ColumnName));
-                    delCmd.CommandText = $@"DELETE FROM `{tableName}` WHERE `{idCol.ColumnName}` = @p0";
-                    delCmd.Parameters.Clear();
-                    delParameter = delCmd.Parameters.Add("@p0", MySqlDbType.Int32, 0, idCol.ColumnName);
                 }
             }
 
             for (var i = 0; i < cmd.Parameters.Count; i++)
             {
                 cmd.Parameters[i].Value = row.ItemArray[i];
-            }
-
-            if (hasIdentity)
-            {
-                delParameter.Value = row[idCol!];
-                delCmd.ExecuteNonQuery();
             }
 
             cmd.ExecuteNonQuery();
