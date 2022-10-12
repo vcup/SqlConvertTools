@@ -153,8 +153,11 @@ public class SqlServerToMySqlCommand : Command
                 buildIgnoreTable = ignoreTables.Concat(item);
             }
 
-            transferTasks.Add(TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
-                buildIgnoreTable.ToArray()));
+            transferTasks.Add(TransferDatabase(
+                sourceConnStrBuilder.ConnectionString,
+                targetConnStrBuilder.ConnectionString,
+                buildIgnoreTable.ToArray())
+            );
         }
 
         Task.WaitAll(transferTasks.ToArray());
@@ -215,6 +218,8 @@ public class SqlServerToMySqlCommand : Command
         var fillTask = sourceDb.FillQueueAsync(queue, sourceDb.GetTableNames().ToArray(), tokenSource.Token);
         var peekTask = targetDb.PeekQueueAsync(queue, tokenSource.Token, CancellationToken.None);
 
+        await Task.WhenAny(fillTask, peekTask);
+        tokenSource.Cancel();
         await Task.WhenAll(fillTask, peekTask);
     }
 }
