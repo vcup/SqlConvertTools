@@ -8,7 +8,7 @@ using SqlConvertTools.Helper;
 
 namespace SqlConvertTools.DbHandlers;
 
-internal class SqlserverHandler : IDbHandler, IDisposable
+internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
 {
     private SqlConnection? _connection;
     private readonly SqlDataAdapter _adapter;

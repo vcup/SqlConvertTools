@@ -8,7 +8,7 @@ using SqlConvertTools.Helper;
 
 namespace SqlConvertTools.DbHandlers;
 
-public class MysqlHandler : IDbHandler, IDisposable
+public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
 {
     private MySqlConnection? _connection;
     private readonly MySqlDataAdapter _adapter;
