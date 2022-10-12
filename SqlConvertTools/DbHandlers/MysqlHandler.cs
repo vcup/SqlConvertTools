@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
@@ -123,6 +124,29 @@ public class MysqlHandler : IDbHandler, IDisposable
         count = _adapter.Fill(dataSet, tableName);
 
         return dataSet;
+    }
+
+    public async Task FillQueueAsync(ConcurrentQueue<DataRow> queue, IEnumerable<string> tables, CancellationToken token)
+    {
+        await using var command = Connection.CreateCommand();
+        foreach (var tblName in tables)
+        {
+            var table = new DataTable(tblName);
+            FillSchema(table);
+            await using var reader = command.ExecuteReader($@"SELECT * FROM `{tblName}`");
+            var colCount = reader.FieldCount;
+            var items = new object?[colCount];
+
+            while (reader.Read() && !token.IsCancellationRequested)
+            {
+                for (var j = 0; j < colCount;)
+                {
+                    items[j] = reader[j++];
+                }
+
+                queue.Enqueue(table.LoadDataRow(items, LoadOption.Upsert));
+            }
+        }
     }
 
     public DataSet FillSchema(string tableName, DataSet? dataSet)

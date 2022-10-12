@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
@@ -15,6 +16,7 @@ public interface IDbHandler
     public void ChangeDatabase(string dbname);
 
     public DataSet FillDataset(string tableName, DataSet? dataSet, out int count);
+    public Task FillQueueAsync(ConcurrentQueue<DataRow> queue, IEnumerable<string> tables, CancellationToken token);
 
     public DataSet FillSchema(string tableName, DataSet? dataSet);
 
