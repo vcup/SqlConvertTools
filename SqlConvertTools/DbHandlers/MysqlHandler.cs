@@ -35,7 +35,7 @@ public class MysqlHandler : IDbHandler, IDisposable
     public MySqlConnectionStringBuilder ConnectionStringBuilder { get; }
     DbConnectionStringBuilder IDbHandler.ConnectionStringBuilder => ConnectionStringBuilder;
 
-    private MySqlConnection Connection => _connection ??= new MySqlConnection(ConnectionStringBuilder.ConnectionString);
+    public MySqlConnection Connection => _connection ??= new MySqlConnection(ConnectionStringBuilder.ConnectionString);
 
     public bool TryConnect(bool fallback = true)
     {
@@ -129,7 +129,7 @@ public class MysqlHandler : IDbHandler, IDisposable
     {
         dataSet ??= new DataSet();
         using var command = Connection.CreateCommand();
-        command.CommandText = $@"Select * From [{tableName}]";
+        command.CommandText = $@"Select * From `{tableName}`";
         command.CommandType = CommandType.Text;
 
         _adapter.SelectCommand = command;
