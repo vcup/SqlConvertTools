@@ -3,7 +3,6 @@ using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using MySql.Data.MySqlClient;
-using Newtonsoft.Json;
 using SqlConvertTools.Extensions;
 using SqlConvertTools.Helper;
 
