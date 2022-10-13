@@ -152,7 +152,8 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
         }
     }
 
-    public async Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token, CancellationToken forceToken)
+    public async Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token,
+        CancellationToken forceToken)
     {
         var tableName = string.Empty;
         var cmdBuilder = new MySqlCommandBuilder(_adapter);
@@ -161,12 +162,13 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
         while (!forceToken.IsCancellationRequested)
         {
             var entry = DateTime.Now;
-            if (queue.IsEmpty && token.IsCancellationRequested) return;
+            if (queue.IsEmpty && token.IsCancellationRequested) break;
             if (!queue.TryDequeue(out var row))
             {
                 await Task.Delay(300, token);
                 continue;
             }
+
             // init think for new Table
             if (tableName != row.Table.TableName)
             {
@@ -194,11 +196,15 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
             // ReSharper disable once MethodSupportsCancellation
             Exec(((MySqlCommand)cmd.Clone()).ExecuteNonQueryAsync(), entry);
         }
-        
-        //return forceToken.IsCancellationRequested ? Task.FromCanceled(forceToken) : Task.CompletedTask;
+
+        // ReSharper disable once MethodSupportsCancellation
+        await Task.Delay(300);
+
         async void Exec(Task task, DateTime entry)
         {
             await task;
+            Console.Write("{0:00000000} {1:R}ms  ", queue.Count, (DateTime.Now - entry).TotalMilliseconds);
+            Console.SetCursorPosition(0, Console.CursorTop);
         }
     }
 
