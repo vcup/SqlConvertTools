@@ -94,11 +94,11 @@ public class SqlServerToMySqlCommand : Command
         AddOption(ignoreTablesForDatabasesOption);
         AddOption(customDatabaseNamesOption);
 
-        this.SetHandler(content =>
+        this.SetHandler(async content =>
         {
             Func<Argument, object?> va = content.ParseResult.GetValueForArgument;
             Func<Option, object?> vo = content.ParseResult.GetValueForOption;
-            Run((string)va(sourceAddressArgument)!, (string)va(targetAddressArgument)!,
+            await Run((string)va(sourceAddressArgument)!, (string)va(targetAddressArgument)!,
                 (string[])va(transferDatabase)!,
                 (string?)vo(sourceUserNameOption), (string?)vo(targetUserNameOption),
                 (string?)vo(passwordOption), (string?)vo(sourcePasswordOption), (string?)vo(targetPasswordOption),
@@ -110,7 +110,7 @@ public class SqlServerToMySqlCommand : Command
         });
     }
 
-    private static async void Run(string sourceAddress, string targetAddress, string[] transferDatabase,
+    private static async Task Run(string sourceAddress, string targetAddress, string[] transferDatabase,
         string? sourceUserName, string? targetUserName,
         string? password, string? sourcePassword, string? targetPassword,
         string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables,
@@ -163,7 +163,7 @@ public class SqlServerToMySqlCommand : Command
         using var sourceDb = new SqlserverHandler(sourceConnectString);
         using var targetDb = new MysqlHandler(targetConnectString);
         using var targetDb4 = new MysqlHandler(targetConnectString);
-        targetDb4.TryConnect();
+        if (!targetDb4.TryConnect(out var e)) throw e;
 
         sourceDb.BeforeFillNewTable += table =>
         {
@@ -198,7 +198,7 @@ public class SqlServerToMySqlCommand : Command
 
             Console.WriteLine($@"Coping table: {table.TableName}");
             // ReSharper disable once AccessToDisposedClosure
-            Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName)}");
+            Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName):000000}");
 
             Console.WriteLine();
 
@@ -207,13 +207,13 @@ public class SqlServerToMySqlCommand : Command
 
         var queue = new ConcurrentQueue<DataRow>();
         var tokenSource = new CancellationTokenSource();
-        sourceDb.TryConnect();
-        targetDb.TryConnect();
+        if (!sourceDb.TryConnect(out e)) throw e;
+        if (!targetDb.TryConnect(out e)) throw e;
         var fillTask = sourceDb.FillQueueAsync(queue, sourceDb.GetTableNames().ToArray(), tokenSource.Token);
         var peekTask = targetDb.PeekQueueAsync(queue, tokenSource.Token, CancellationToken.None);
 
-        await Task.WhenAny(fillTask, peekTask);
+        await fillTask;
         tokenSource.Cancel();
-        await Task.WhenAll(fillTask, peekTask);
+        await peekTask;
     }
 }
