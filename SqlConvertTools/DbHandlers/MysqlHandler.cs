@@ -201,8 +201,8 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
         async void Exec(Task task, DateTime entry)
         {
             await task;
-            Console.Write("{0:D6} {1:f4}ms  ", queue.Count, (DateTime.Now - entry).TotalMilliseconds);
-            Console.SetCursorPosition(0, Console.CursorTop);
+            Console.WriteLine("{0:D6} {1:f4}ms  ", queue.Count, (DateTime.Now - entry).TotalMilliseconds);
+            Console.SetCursorPosition(0, Console.CursorTop - 1);
         }
     }
 
