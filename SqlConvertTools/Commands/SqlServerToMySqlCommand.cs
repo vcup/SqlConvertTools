@@ -198,7 +198,7 @@ public class SqlServerToMySqlCommand : Command
 
             Console.WriteLine($@"Coping table: {table.TableName}");
             // ReSharper disable once AccessToDisposedClosure
-            Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName):000000}");
+            Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName):d4}");
 
             Console.WriteLine();
 
