@@ -191,10 +191,15 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
                 cmd.Parameters[i].Value = row.ItemArray[i];
             }
 
-            cmd.ExecuteNonQuery();
+            // ReSharper disable once MethodSupportsCancellation
+            Exec(((MySqlCommand)cmd.Clone()).ExecuteNonQueryAsync(), entry);
         }
         
         //return forceToken.IsCancellationRequested ? Task.FromCanceled(forceToken) : Task.CompletedTask;
+        async void Exec(Task task, DateTime entry)
+        {
+            await task;
+        }
     }
 
     public event Func<DataTable, bool>? BeforeFillNewTable;

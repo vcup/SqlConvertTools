@@ -110,7 +110,7 @@ public class SqlServerToMySqlCommand : Command
         });
     }
 
-    private static void Run(string sourceAddress, string targetAddress, string[] transferDatabase,
+    private static async void Run(string sourceAddress, string targetAddress, string[] transferDatabase,
         string? sourceUserName, string? targetUserName,
         string? password, string? sourcePassword, string? targetPassword,
         string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables,
@@ -138,7 +138,6 @@ public class SqlServerToMySqlCommand : Command
             transferDatabase = dbHandler.GetDatabases().ToArray();
         }
 
-        var transferTasks = new List<Task>();
         foreach (var dbname in transferDatabase)
         {
             sourceConnStrBuilder.InitialCatalog = targetConnStrBuilder.Database = dbname;
@@ -153,14 +152,9 @@ public class SqlServerToMySqlCommand : Command
                 buildIgnoreTable = ignoreTables.Concat(item);
             }
 
-            transferTasks.Add(TransferDatabase(
-                sourceConnStrBuilder.ConnectionString,
-                targetConnStrBuilder.ConnectionString,
-                buildIgnoreTable.ToArray())
-            );
+            await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
+                buildIgnoreTable.ToArray());
         }
-
-        Task.WaitAll(transferTasks.ToArray());
     }
 
     private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
