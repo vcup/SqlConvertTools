@@ -161,7 +161,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
 
         while (!forceToken.IsCancellationRequested)
         {
-            var entry = DateTime.Now;
+            var enter = DateTime.Now;
             if (queue.IsEmpty && token.IsCancellationRequested) break;
             if (!queue.TryDequeue(out var row))
             {
@@ -195,7 +195,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
             }
 
             // ReSharper disable once MethodSupportsCancellation
-            Exec(((MySqlCommand)cmd.Clone()).ExecuteNonQueryAsync(), entry);
+            Exec(((MySqlCommand)cmd.Clone()).ExecuteNonQueryAsync(), enter);
         }
 
         async void Exec(Task task, DateTime enter)
