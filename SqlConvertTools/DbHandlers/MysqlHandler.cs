@@ -183,7 +183,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
                 if (DbHelper.TryGetIdentityColumn(table.Columns, out var idCol))
                 {
                     cmd.CommandText = cmd.CommandText
-                        .InsertAfter($"`{tableName}` (", $"`{idCol!.ColumnName}`, ", StringComparison.OrdinalIgnoreCase)
+                        .InsertAfter($"`{tableName}` (", $"`{idCol.ColumnName}`, ", StringComparison.OrdinalIgnoreCase)
                         .InsertAfter("VALUES (", "@p0, ", StringComparison.OrdinalIgnoreCase);
                     cmd.Parameters.Insert(0, new MySqlParameter("@p0", MySqlDbType.Int32, 0, idCol.ColumnName));
                 }
@@ -198,10 +198,10 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
             Exec(((MySqlCommand)cmd.Clone()).ExecuteNonQueryAsync(), entry);
         }
 
-        async void Exec(Task task, DateTime entry)
+        async void Exec(Task task, DateTime enter)
         {
             await task;
-            Console.WriteLine("{0:D6} {1:f4}ms  ", queue.Count, (DateTime.Now - entry).TotalMilliseconds);
+            Console.WriteLine("{0:D6} {1:f4}ms  ", queue.Count, (DateTime.Now - enter).TotalMilliseconds);
             Console.SetCursorPosition(0, Console.CursorTop - 1);
         }
     }
@@ -234,7 +234,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
     {
         using var reader = Connection
             .CreateCommand()
-            .ExecuteReader($@"Show Databases {(excludeSysDb ? "where `Database` not regexp 'schema|sys|mysql';" : "")}");
+            .ExecuteReader($@"Show Databases{(excludeSysDb ? " where `Database` not regexp 'schema|sys|mysql';" : ';')}");
         while (reader.Read())
         {
             yield return (string)reader["Database"];
@@ -307,9 +307,8 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
 
     public int GetRowCount(string tableName)
     {
-        
         return (int)Connection.CreateCommand()
-            .ExecuteScalar($"Select COUNT(1) From [{tableName}]");
+            .ExecuteScalar($"Select COUNT(1) From `{tableName}`");
     }
 
     public void Dispose()
