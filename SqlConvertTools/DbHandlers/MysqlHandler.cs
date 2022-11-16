@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
-using MySql.Data.MySqlClient;
+using MySqlConnector;
 using SqlConvertTools.Extensions;
 using SqlConvertTools.Helper;
 
@@ -182,14 +182,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
             }
 
             // ReSharper disable once MethodSupportsCancellation
-            Exec(((MySqlCommand)cmd.Clone()).ExecuteNonQueryAsync(), enter);
-        }
-
-        async void Exec(Task task, DateTime enter)
-        {
-            await task;
-            Console.WriteLine("{0:D6} {1:f4}ms  ", queue.Count, (DateTime.Now - enter).TotalMilliseconds);
-            Console.SetCursorPosition(0, Console.CursorTop - 1);
+            await cmd.ExecuteNonQueryAsync();
         }
     }
 

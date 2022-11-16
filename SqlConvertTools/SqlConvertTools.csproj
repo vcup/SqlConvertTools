@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MySql.Data" Version="8.0.30" />
+    <PackageReference Include="MySqlConnector" Version="2.2.0" />
     <PackageReference Include="SqlSugarCore" Version="5.1.2.3" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlcipher" Version="2.1.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
