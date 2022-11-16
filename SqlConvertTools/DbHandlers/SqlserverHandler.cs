@@ -117,19 +117,6 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposa
         Connection.ChangeDatabase(dbname);
     }
 
-    public DataSet FillDataset(string tableName, DataSet? dataSet, out int count)
-    {
-        dataSet ??= new DataSet();
-        using var command = Connection.CreateCommand();
-        command.CommandText = @$"Select * From [{tableName}]";
-        command.CommandType = CommandType.Text;
-
-        _adapter.SelectCommand = command;
-        count = _adapter.Fill(dataSet, tableName);
-
-        return dataSet;
-    }
-
     public async Task FillQueueAsync(ConcurrentQueue<DataRow> queue, IEnumerable<string> tables, CancellationToken token)
     {
         await using var command = Connection.CreateCommand();
@@ -158,53 +145,7 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposa
 
     public Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token, CancellationToken forceToken)
     {
-        var tableName = string.Empty;
-        using var cmdBuilder = new SqlCommandBuilder();
-        SqlCommand cmd = null!;
-        var delCmd = Connection.CreateCommand();
-        SqlParameter delParameter = null!;
-
-        var hasIdentity = false;
-        DataColumn? idCol = null;
-        while (forceToken.IsCancellationRequested)
-        {
-            if (queue.IsEmpty && token.IsCancellationRequested) return Task.CompletedTask;
-            if (!queue.TryDequeue(out var row)) continue;
-            // init think for new Table
-            if (tableName != row.Table.TableName)
-            {
-                var table = row.Table;
-                tableName = table.TableName;
-                cmdBuilder.DataAdapter.SelectCommand = Connection.CreateCommand();
-                cmdBuilder.DataAdapter.SelectCommand.CommandText = $@"SELECT * FROM [{tableName}]";
-                cmd = cmdBuilder.GetInsertCommand();
-                // ReSharper disable once AssignmentInConditionalExpression
-                if (hasIdentity = DbHelper.TryGetIdentityColumn(table.Columns, out idCol))
-                {
-                    cmd.CommandText = cmd.CommandText
-                        .InsertAfter($"[{tableName}] (", $"[{idCol!.ColumnName}], ")
-                        .InsertAfter("VALUES (", "@p0, ");
-                    cmd.Parameters.Insert(0, new SqlParameter("@p0", SqlDbType.Int, 0, idCol.ColumnName));
-                    delCmd.CommandText = $@"DELETE FROM [{tableName}] WHERE [{idCol.ColumnName}] = @p0";
-                    delParameter = delCmd.Parameters.Add("@p0", SqlDbType.Int, 0, idCol.ColumnName);
-                }
-            }
-
-            for (var i = 0; i < cmd.Parameters.Count; i++)
-            {
-                cmd.Parameters[i].Value = row.ItemArray[i];
-            }
-
-            if (hasIdentity)
-            {
-                delParameter.Value = row[idCol!];
-                delCmd.ExecuteNonQuery();
-            }
-
-            cmd.ExecuteNonQuery();
-        }
-
-        return forceToken.IsCancellationRequested ? Task.FromCanceled(forceToken) : Task.CompletedTask;
+        throw new NotImplementedException("origin impl is not tested");
     }
 
     public event Func<DataTable, bool>? BeforeFillNewTable;
@@ -265,74 +206,6 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposa
         {
             Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSqlForSqlserver(table));
         }
-    }
-
-    public int UpdateDatabaseWith(DataTable table)
-    {
-        var tableName = table.TableName;
-
-        _adapter.SelectCommand = Connection.CreateCommand();
-        _adapter.SelectCommand.CommandText = $"SELECT * FROM [{tableName}]";
-        var cmdBuilder = new SqlCommandBuilder(_adapter);
-
-        var cols = table.Columns;
-        var hasIdentity = DbHelper.TryGetIdentityColumn(cols, out var idCol);
-
-        using var cmd = cmdBuilder.GetInsertCommand();
-        using var deleteCmd = Connection.CreateCommand();
-        SqlParameter delCmdParam = null!;
-        if (hasIdentity)
-        {
-            cmd.CommandText = cmd.CommandText
-                .InsertAfter($"[{tableName}] (", $"[{idCol!.ColumnName}], ")
-                .InsertAfter("VALUES (", "@p0, ");
-            cmd.Parameters.Insert(0, new SqlParameter("@p0", SqlDbType.Int, 0, idCol.ColumnName));
-            deleteCmd.CommandText = $"DELETE FROM [{tableName}] WHERE [{idCol.ColumnName}] = @p0";
-            delCmdParam = deleteCmd.Parameters.Add("@p0", SqlDbType.Int, 0, idCol.ColumnName)!;
-        }
-
-        var rows = table.Rows;
-        if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT [{tableName}] ON");
-        for (var j = 0; j < rows.Count; j++)
-        {
-            for (var k = 0; k < cmd.Parameters.Count; k++)
-            {
-                cmd.Parameters[k].Value = rows[j].ItemArray[k];
-            }
-
-            if (hasIdentity)
-            {
-                delCmdParam.Value = rows[j][idCol!];
-                deleteCmd.ExecuteNonQuery();
-            }
-
-            cmd.ExecuteNonQuery();
-        }
-
-        if (hasIdentity) Connection.CreateCommand().ExecuteNonQuery($"SET IDENTITY_INSERT [{tableName}] OFF");
-        return rows.Count;
-    }
-
-    public int UpdateDatabaseWith(DataSet dataSet, string? targetDb = null)
-    {
-        if (targetDb is not null)
-        {
-            ChangeDatabase(targetDb);
-        }
-
-        var rowCount = 0;
-        for (var i = 0; i < dataSet.Tables.Count; i++)
-        {
-            var table = dataSet.Tables[i];
-            if (targetDb is not null) // than try create table 
-            {
-                CreateTable(table);
-            }
-
-            rowCount += UpdateDatabaseWith(table);
-        }
-
-        return rowCount;
     }
 
     public int GetRowCount(string tableName)

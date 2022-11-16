@@ -162,6 +162,7 @@ public class SqlServerTransferCommand : Command
     private static void TransferDatabase(string sourceConnectString, string targetConnectString,
         string[] ignoreTables)
     {
+        throw new NotImplementedException();
         using var sourceDb = new SqlserverHandler(sourceConnectString);
         using var targetDb = new SqlserverHandler(targetConnectString);
 
@@ -203,9 +204,9 @@ public class SqlServerTransferCommand : Command
             Console.WriteLine($@"Coping table: {tableName}");
             Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName)}");
 
-            sourceDb.FillDataset(tableName, dataSet, out _);
+            //sourceDb.FillDataset(tableName, dataSet, out _);
 
-            targetDb.UpdateDatabaseWith(table);
+            //targetDb.UpdateDatabaseWith(table);
             Console.WriteLine();
         }
     }

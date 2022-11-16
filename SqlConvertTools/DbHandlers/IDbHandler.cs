@@ -15,8 +15,6 @@ public interface IDbHandler
 
     public void ChangeDatabase(string dbname);
 
-    public DataSet FillDataset(string tableName, DataSet? dataSet, out int count);
-
     public DataSet FillSchema(string tableName, DataSet? dataSet);
 
     public void FillSchema(DataTable table);
@@ -26,8 +24,6 @@ public interface IDbHandler
     public IEnumerable<string> GetTableNames();
 
     public void CreateTable(DataTable table);
-
-    public int UpdateDatabaseWith(DataTable table);
 
     public int GetRowCount(string tableName);
 }
