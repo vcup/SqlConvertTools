@@ -148,7 +148,6 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
 
         while (!forceToken.IsCancellationRequested)
         {
-            var enter = DateTime.Now;
             if (queue.IsEmpty && token.IsCancellationRequested) break;
             if (!queue.TryDequeue(out var row))
             {
