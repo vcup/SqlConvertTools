@@ -117,29 +117,24 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposa
         Connection.ChangeDatabase(dbname);
     }
 
-    public async Task FillQueueAsync(ConcurrentQueue<DataRow> queue, IEnumerable<string> tables, CancellationToken token)
+    public async Task FillQueueAsync(ConcurrentQueue<DataRow> queue, string tableName, CancellationToken token)
     {
         await using var command = Connection.CreateCommand();
-        foreach (var tblName in tables)
+        var table = new DataTable(tableName);
+        FillSchema(table);
+
+        await using var reader = command.ExecuteReader($@"SELECT * FROM [{tableName}]");
+        var colCount = reader.FieldCount;
+        var items = new object?[colCount];
+
+        while (await reader.ReadAsync(token) && !token.IsCancellationRequested)
         {
-            var table = new DataTable(tblName);
-            FillSchema(table);
-            var reject = BeforeFillNewTable?.Invoke(table);
-            if (reject.HasValue && reject.Value) continue;
-
-            await using var reader = command.ExecuteReader($@"SELECT * FROM [{tblName}]");
-            var colCount = reader.FieldCount;
-            var items = new object?[colCount];
-
-            while (await reader.ReadAsync(token) && !token.IsCancellationRequested)
+            for (var j = 0; j < colCount;)
             {
-                for (var j = 0; j < colCount;)
-                {
-                    items[j] = reader[j++];
-                }
-
-                queue.Enqueue(table.LoadDataRow(items, LoadOption.Upsert));
+                items[j] = reader[j++];
             }
+
+            queue.Enqueue(table.LoadDataRow(items, LoadOption.Upsert));
         }
     }
 
@@ -147,8 +142,6 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposa
     {
         throw new NotImplementedException("origin impl is not tested");
     }
-
-    public event Func<DataTable, bool>? BeforeFillNewTable;
 
     public DataSet FillSchema(string tableName, DataSet? dataSet)
     {

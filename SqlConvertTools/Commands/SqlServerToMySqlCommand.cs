@@ -160,12 +160,13 @@ public class SqlServerToMySqlCommand : Command
     private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
         string[] ignoreTables)
     {
+        throw new NotImplementedException("need impl cloneable handler");
         using var sourceDb = new SqlserverHandler(sourceConnectString);
         using var targetDb = new MysqlHandler(targetConnectString);
         using var targetDb4 = new MysqlHandler(targetConnectString);
         if (!targetDb4.TryConnect(out var e)) throw e;
 
-        sourceDb.BeforeFillNewTable += table =>
+        Func<DataTable, bool> beforeFillTable = table =>
         {
             var tableName = table.TableName;
             //if (tableName is not "") continue;
@@ -209,7 +210,7 @@ public class SqlServerToMySqlCommand : Command
         var tokenSource = new CancellationTokenSource();
         if (!sourceDb.TryConnect(out e)) throw e;
         if (!targetDb.TryConnect(out e)) throw e;
-        var fillTask = sourceDb.FillQueueAsync(queue, sourceDb.GetTableNames().ToArray(), tokenSource.Token);
+        var fillTask = sourceDb.FillQueueAsync(queue, sourceDb.GetTableNames().ToArray().First(), tokenSource.Token);
         var peekTask = targetDb.PeekQueueAsync(queue, tokenSource.Token, CancellationToken.None);
 
         await fillTask;
