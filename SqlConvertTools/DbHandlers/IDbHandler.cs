@@ -26,4 +26,6 @@ public interface IDbHandler
     public void CreateTable(DataTable table);
 
     public int GetRowCount(string tableName);
+
+    public IDbHandler Clone();
 }

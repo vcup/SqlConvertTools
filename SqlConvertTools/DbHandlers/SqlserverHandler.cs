@@ -207,6 +207,11 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposa
             .ExecuteScalar($"Select COUNT(1) From [{tableName}]");
     }
 
+    public IDbHandler Clone()
+    {
+        return new SqlserverHandler(ConnectionStringBuilder.ConnectionString);
+    }
+
     public void Dispose()
     {
         _connection?.Dispose();

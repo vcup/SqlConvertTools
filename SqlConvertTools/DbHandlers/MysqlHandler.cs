@@ -239,6 +239,11 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
             .ExecuteScalar($"Select COUNT(1) From `{tableName}`");
     }
 
+    public IDbHandler Clone()
+    {
+        return new MysqlHandler(new MySqlConnectionStringBuilder(ConnectionStringBuilder.ConnectionString));
+    }
+
     public void Dispose()
     {
         _connection?.Dispose();
