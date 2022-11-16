@@ -137,37 +137,37 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
     public async Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token,
         CancellationToken forceToken)
     {
-        var tableName = string.Empty;
+        begin:
+        if (!queue.TryDequeue(out var row))
+        {
+            goto begin;
+        }
+
+        var table = row.Table;
+        var tableName = table.TableName;
         var cmdBuilder = new MySqlCommandBuilder(_adapter);
-        MySqlCommand cmd = null!;
+        _adapter.SelectCommand = Connection.CreateCommand();
+        _adapter.SelectCommand.CommandText = $@"SELECT * FROM `{tableName}`";
+        cmdBuilder.Dispose();
+        cmdBuilder = new MySqlCommandBuilder(_adapter);
+
+        var cmd = cmdBuilder.GetInsertCommand();
+        if (DbHelper.TryGetIdentityColumn(table.Columns, out var idCol))
+        {
+            cmd.CommandText = cmd.CommandText
+                .InsertAfter($"`{tableName}` (", $"`{idCol.ColumnName}`, ", StringComparison.OrdinalIgnoreCase)
+                .InsertAfter("VALUES (", "@p0, ", StringComparison.OrdinalIgnoreCase);
+            cmd.Parameters.Insert(0, new MySqlParameter("@p0", MySqlDbType.Int32, 0, idCol.ColumnName));
+        }
 
         while (!forceToken.IsCancellationRequested)
         {
             if (queue.IsEmpty && token.IsCancellationRequested) break;
-            if (!queue.TryDequeue(out var row))
+            if (!queue.TryDequeue(out row))
             {
                 // ReSharper disable once MethodSupportsCancellation
                 await Task.Delay(300);
                 continue;
-            }
-
-            // init think for new Table
-            if (tableName != row.Table.TableName)
-            {
-                var table = row.Table;
-                tableName = table.TableName;
-                _adapter.SelectCommand = Connection.CreateCommand();
-                _adapter.SelectCommand.CommandText = $@"SELECT * FROM `{tableName}`";
-                cmdBuilder.Dispose();
-                cmdBuilder = new MySqlCommandBuilder(_adapter);
-                cmd = cmdBuilder.GetInsertCommand();
-                if (DbHelper.TryGetIdentityColumn(table.Columns, out var idCol))
-                {
-                    cmd.CommandText = cmd.CommandText
-                        .InsertAfter($"`{tableName}` (", $"`{idCol.ColumnName}`, ", StringComparison.OrdinalIgnoreCase)
-                        .InsertAfter("VALUES (", "@p0, ", StringComparison.OrdinalIgnoreCase);
-                    cmd.Parameters.Insert(0, new MySqlParameter("@p0", MySqlDbType.Int32, 0, idCol.ColumnName));
-                }
             }
 
             for (var i = 0; i < cmd.Parameters.Count; i++)
