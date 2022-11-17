@@ -261,7 +261,7 @@ public class SqlServerToMySqlCommand : Command
         {
             while (!token.IsCancellationRequested)
             {
-                Console.WriteLine($"{PrevCount}/{TotalCount} +{CurrentCount - PrevCount:d5}");
+                Console.WriteLine($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D4}");
                 Console.SetCursorPosition(0, Console.CursorTop - 1);
                 PrevCount = CurrentCount;
                 await Task.Delay(300, token);
