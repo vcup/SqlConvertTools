@@ -226,11 +226,6 @@ public class SqlServerToMySqlCommand : Command
             if (rowCount is 0) continue;
             Logging.TotalCount += rowCount;
 
-            while (tasks.Count(i => !(i.IsCompleted | i.IsCanceled | i.IsCompletedSuccessfully)) >= 3)
-            {
-                await Task.Delay(1000, tokenSource.Token);
-            }
-
             if (tasks.Any(i => i.IsFaulted)) await Task.WhenAll(tasks);
 
             var reader = await sourceDb.CreateDataReader(tblName);
@@ -246,7 +241,7 @@ public class SqlServerToMySqlCommand : Command
         catch (TaskCanceledException)
         {
         }
-        Console.WriteLine($"\n\nSuccess transfer Database {targetDb.ConnectionStringBuilder.Database} for {totalCount} row");
+        Console.WriteLine($"Success transfer Database {targetDb.ConnectionStringBuilder.Database} for {totalCount} row");
     }
     private static class Logging
     {
