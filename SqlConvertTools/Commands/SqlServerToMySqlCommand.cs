@@ -167,10 +167,17 @@ public class SqlServerToMySqlCommand : Command
         var counter = new Dictionary<object, long>();
         var totalCount = 0L;
 
-        targetDb.BulkCopyEvent += (sender, args) => counter[sender] = args.RowsCopied;
+        targetDb.BulkCopyEvent += (sender, args) =>
+        {
+            lock (counter)
+            {
+                counter[sender] = args.RowsCopied;
+                Logging.CurrentCount = counter.Values.Sum();
+            }
+        };
 
         var tokenSource = new CancellationTokenSource();
-        var loggingTask = Logging(tokenSource.Token);
+        var loggingTask = Logging.LogForCancel(tokenSource.Token);
 
         sourceDb.TryConnect();
         targetDb.TryConnect();
@@ -218,7 +225,7 @@ public class SqlServerToMySqlCommand : Command
             #endregion
 
             if (rowCount is 0) continue;
-            totalCount += rowCount;
+            Logging.TotalCount += rowCount;
 
             while (tasks.Count(i => !(i.IsCompleted | i.IsCanceled | i.IsCompletedSuccessfully)) >= 3)
             {
@@ -234,16 +241,27 @@ public class SqlServerToMySqlCommand : Command
         tokenSource.Cancel();
         await loggingTask;
         Console.Write($"\n\nSuccess transfer Database {targetDb.ConnectionStringBuilder.Database} for {totalCount} row");
+    }
+    private static class Logging
+    {
+        public static long TotalCount;
+        public static long CurrentCount;
+        private static long _prevCount;
 
-        async Task Logging(CancellationToken token)
+        public static void LogOnce()
         {
-            for (var prevCount = 0L; !token.IsCancellationRequested; await Task.Delay(100, token))
+            if (CurrentCount == _prevCount) return;
+            Console.WriteLine($"{_prevCount}/{TotalCount} +{CurrentCount - _prevCount:d5}");
+            Console.SetCursorPosition(0, Console.CursorTop - 1);
+            _prevCount = CurrentCount;
+        }
+
+        public static async Task LogForCancel(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
             {
-                var currentCount = counter.Values.Sum();
-                if (currentCount == prevCount) continue;
-                Console.WriteLine($"{prevCount}/{totalCount} +{currentCount - prevCount:d5}");
-                Console.SetCursorPosition(0, Console.CursorTop - 1);
-                prevCount = currentCount;
+                LogOnce();
+                await Task.Delay(100, token);
             }
         }
     }
