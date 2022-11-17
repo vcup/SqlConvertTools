@@ -185,7 +185,6 @@ public class SqlServerToMySqlCommand : Command
         var tables = sourceDb.GetTableNames().ToArray();
         foreach (var tblName in tables)
         {
-            var reader = await sourceDb.CreateDataReader(tblName);
             var table = new DataTable(tblName);
             sourceDb.FillSchema(table);
             targetDb.CreateTable(table);
@@ -234,6 +233,7 @@ public class SqlServerToMySqlCommand : Command
 
             if (tasks.Any(i => i.IsFaulted)) await Task.WhenAll(tasks);
 
+            var reader = await sourceDb.CreateDataReader(tblName);
             tasks.Add(targetDb.BulkCopy(tblName, reader));
         }
 
