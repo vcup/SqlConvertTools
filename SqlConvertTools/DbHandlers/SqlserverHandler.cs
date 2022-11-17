@@ -219,7 +219,7 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
 
     public async Task<IDataReader> CreateDataReader(string tableName)
     {
-        var newConnection = new SqlConnection(ConnectionStringBuilder.ConnectionString);
+        await using var newConnection = new SqlConnection(ConnectionStringBuilder.ConnectionString);
         await newConnection.OpenAsync();
         await using var command = newConnection.CreateCommand();
 

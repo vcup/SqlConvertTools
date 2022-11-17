@@ -253,7 +253,8 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
 
     public async Task<IDataReader> CreateDataReader(string tableName)
     {
-        await using var command = Connection.Clone().CreateCommand();
+        await using var cloneConnection = Connection.Clone();
+        await using var command = cloneConnection.CreateCommand();
 
         var reader = command.ExecuteReader($@"SELECT * FROM `{tableName}`");
         return reader;
@@ -261,7 +262,8 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
 
     public async Task BulkCopy(string tableName, IDataReader reader)
     {
-        var bulkCopy = new MySqlBulkCopy(Connection.CloneWith(ConnectionStringBuilder.ConnectionString))
+        await using var connectionCopy = Connection.CloneWith(ConnectionStringBuilder.ConnectionString);
+        var bulkCopy = new MySqlBulkCopy(connectionCopy)
         {
             DestinationTableName = tableName,
             NotifyAfter = 51,
