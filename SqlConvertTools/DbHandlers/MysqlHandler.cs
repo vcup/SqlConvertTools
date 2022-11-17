@@ -280,7 +280,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
         var property = type.GetProperty("RowsCopied");
         property!.SetValue(args, result.RowsInserted);
         BulkCopyEvent(bulkCopy, args);
-        reader.Dispose();
+        reader.Dispose(true);
     }
 
     public event MySqlRowsCopiedEventHandler BulkCopyEvent;
