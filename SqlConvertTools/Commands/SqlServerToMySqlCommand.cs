@@ -249,19 +249,13 @@ public class SqlServerToMySqlCommand : Command
         public static long CurrentCount;
         private static long _prevCount;
 
-        public static void LogOnce()
-        {
-            if (CurrentCount == _prevCount) return;
-            Console.WriteLine($"{_prevCount}/{TotalCount} +{CurrentCount - _prevCount:d5}");
-            Console.SetCursorPosition(0, Console.CursorTop - 1);
-            _prevCount = CurrentCount;
-        }
-
         public static async Task LogForCancel(CancellationToken token)
         {
             while (!token.IsCancellationRequested)
             {
-                LogOnce();
+                Console.WriteLine($"{_prevCount}/{TotalCount} +{CurrentCount - _prevCount:d5}");
+                Console.SetCursorPosition(0, Console.CursorTop - 1);
+                _prevCount = CurrentCount;
                 await Task.Delay(100, token);
             }
         }
