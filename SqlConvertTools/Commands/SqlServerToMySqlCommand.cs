@@ -258,7 +258,7 @@ public class SqlServerToMySqlCommand : Command
                 Console.WriteLine($"{_prevCount}/{TotalCount} +{CurrentCount - _prevCount:d5}");
                 Console.SetCursorPosition(0, Console.CursorTop - 1);
                 _prevCount = CurrentCount;
-                await Task.Delay(100, token);
+                await Task.Delay(300, token);
             }
         }
     }
