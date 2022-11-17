@@ -237,7 +237,7 @@ public class SqlServerToMySqlCommand : Command
 
         async Task Logging(CancellationToken token)
         {
-            for (var prevCount = 0L; !token.IsCancellationRequested; await Task.Delay(0, token))
+            for (var prevCount = 0L; !token.IsCancellationRequested; await Task.Delay(100, token))
             {
                 var currentCount = counter.Values.Sum();
                 if (currentCount == prevCount) continue;
