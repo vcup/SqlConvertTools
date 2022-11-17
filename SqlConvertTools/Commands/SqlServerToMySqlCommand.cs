@@ -178,8 +178,13 @@ public class SqlServerToMySqlCommand : Command
         var tokenSource = new CancellationTokenSource();
         var loggingTask = Logging.LogForCancel(tokenSource.Token);
 
-        sourceDb.TryConnect();
-        targetDb.TryConnect();
+        {
+            if (!sourceDb.TryConnect(out var e)) throw e;
+        }
+        {
+            if (!targetDb.TryConnect(out var e)) throw e;
+        }
+
         var tasks = new List<Task>();
         var tables = sourceDb.GetTableNames().ToArray();
         foreach (var tblName in tables)
