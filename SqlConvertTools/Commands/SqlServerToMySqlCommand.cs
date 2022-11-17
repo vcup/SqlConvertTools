@@ -243,21 +243,22 @@ public class SqlServerToMySqlCommand : Command
 
         Console.WriteLine($"Success transfer Database " +
                           $"{targetDb.ConnectionStringBuilder.Database} for {Logging.TotalCount} row");
+        Logging.PrevCount = Logging.CurrentCount = Logging.TotalCount = 0;
     }
 
     private static class Logging
     {
         public static long TotalCount;
         public static long CurrentCount;
-        private static long _prevCount;
+        public static long PrevCount;
 
         public static async Task LogForCancel(CancellationToken token)
         {
             while (!token.IsCancellationRequested)
             {
-                Console.WriteLine($"{_prevCount}/{TotalCount} +{CurrentCount - _prevCount:d5}");
+                Console.WriteLine($"{PrevCount}/{TotalCount} +{CurrentCount - PrevCount:d5}");
                 Console.SetCursorPosition(0, Console.CursorTop - 1);
-                _prevCount = CurrentCount;
+                PrevCount = CurrentCount;
                 await Task.Delay(300, token);
             }
         }
