@@ -165,7 +165,6 @@ public class SqlServerToMySqlCommand : Command
         targetDb.ConnectionStringBuilder.AllowLoadLocalInfile = true;
 
         var counter = new Dictionary<object, long>();
-        var totalCount = 0L;
 
         targetDb.BulkCopyEvent += (sender, args) =>
         {
@@ -241,8 +240,11 @@ public class SqlServerToMySqlCommand : Command
         catch (TaskCanceledException)
         {
         }
-        Console.WriteLine($"Success transfer Database {targetDb.ConnectionStringBuilder.Database} for {totalCount} row");
+
+        Console.WriteLine($"Success transfer Database " +
+                          $"{targetDb.ConnectionStringBuilder.Database} for {Logging.TotalCount} row");
     }
+
     private static class Logging
     {
         public static long TotalCount;
