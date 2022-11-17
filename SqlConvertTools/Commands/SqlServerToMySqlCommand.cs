@@ -239,8 +239,14 @@ public class SqlServerToMySqlCommand : Command
 
         await Task.WhenAll(tasks.ToArray());
         tokenSource.Cancel();
-        await loggingTask;
-        Console.Write($"\n\nSuccess transfer Database {targetDb.ConnectionStringBuilder.Database} for {totalCount} row");
+        try
+        {
+            await loggingTask;
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        Console.WriteLine($"\n\nSuccess transfer Database {targetDb.ConnectionStringBuilder.Database} for {totalCount} row");
     }
     private static class Logging
     {
