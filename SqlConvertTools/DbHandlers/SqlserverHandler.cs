@@ -2,14 +2,13 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
 using Microsoft.Data.SqlClient;
 using SqlConvertTools.Extensions;
 using SqlConvertTools.Helper;
 
 namespace SqlConvertTools.DbHandlers;
 
-internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
+internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableDbHandler, IDisposable
 {
     private SqlConnection? _connection;
     private readonly SqlDataAdapter _adapter;
@@ -216,5 +215,20 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposa
     {
         _connection?.Dispose();
         _adapter.Dispose();
+    }
+
+    public async Task<IDataReader> CreateDataReader(string tableName)
+    {
+        var newConnection = new SqlConnection(ConnectionStringBuilder.ConnectionString);
+        await newConnection.OpenAsync();
+        await using var command = newConnection.CreateCommand();
+
+        var reader = command.ExecuteReader($@"SELECT * FROM [{tableName}]");
+        return reader;
+    }
+
+    public Task BulkCopy(string tableName, IDataReader reader)
+    {
+        throw new NotImplementedException();
     }
 }

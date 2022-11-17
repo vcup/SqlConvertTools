@@ -2,13 +2,14 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using MySqlConnector;
 using SqlConvertTools.Extensions;
 using SqlConvertTools.Helper;
 
 namespace SqlConvertTools.DbHandlers;
 
-public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
+public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableDbHandler, IDisposable
 {
     private MySqlConnection? _connection;
     private readonly MySqlDataAdapter _adapter;
@@ -249,4 +250,36 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IDisposable
         _connection?.Dispose();
         _adapter.Dispose();
     }
+
+    public async Task<IDataReader> CreateDataReader(string tableName)
+    {
+        await using var command = Connection.Clone().CreateCommand();
+
+        var reader = command.ExecuteReader($@"SELECT * FROM `{tableName}`");
+        return reader;
+    }
+
+    public async Task BulkCopy(string tableName, IDataReader reader)
+    {
+        var bulkCopy = new MySqlBulkCopy(Connection.CloneWith(ConnectionStringBuilder.ConnectionString))
+        {
+            DestinationTableName = tableName,
+            NotifyAfter = 51,
+        };
+        bulkCopy.MySqlRowsCopied += (sender, args) => BulkCopyEvent.Invoke(sender, args);
+
+        var result = await bulkCopy.WriteToServerAsync(reader);
+
+        var type = typeof(MySqlRowsCopiedEventArgs);
+        var args = (MySqlRowsCopiedEventArgs)type.GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            Array.Empty<Type>())!
+            .Invoke(Array.Empty<object>());
+        var property = type.GetProperty("RowsCopied");
+        property!.SetValue(args, result.RowsInserted);
+        BulkCopyEvent(bulkCopy, args);
+        reader.Dispose();
+    }
+
+    public event MySqlRowsCopiedEventHandler BulkCopyEvent;
 }

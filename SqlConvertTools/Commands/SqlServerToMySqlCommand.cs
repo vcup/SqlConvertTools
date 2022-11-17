@@ -1,9 +1,8 @@
-using System.Collections.Concurrent;
 using System.CommandLine;
 using System.Data;
 using Microsoft.Data.SqlClient;
-using MySql.Data.MySqlClient;
 using SqlConvertTools.DbHandlers;
+using MySqlConnectionStringBuilder = MySql.Data.MySqlClient.MySqlConnectionStringBuilder;
 
 namespace SqlConvertTools.Commands;
 
@@ -160,17 +159,33 @@ public class SqlServerToMySqlCommand : Command
     private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
         string[] ignoreTables)
     {
-        throw new NotImplementedException("need impl cloneable handler");
-        using var sourceDb = new SqlserverHandler(sourceConnectString);
-        using var targetDb = new MysqlHandler(targetConnectString);
-        using var targetDb4 = new MysqlHandler(targetConnectString);
-        if (!targetDb4.TryConnect(out var e)) throw e;
+        ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
+        var sourceDb = new SqlserverHandler(sourceConnectString);
+        var targetDb = new MysqlHandler(targetConnectString);
+        targetDb.ConnectionStringBuilder.AllowLoadLocalInfile = true;
 
-        Func<DataTable, bool> beforeFillTable = table =>
+        var counter = new Dictionary<object, long>();
+        var totalCount = 0L;
+
+        targetDb.BulkCopyEvent += (sender, args) => counter[sender] = args.RowsCopied;
+
+        var tokenSource = new CancellationTokenSource();
+        var loggingTask = Logging(tokenSource.Token);
+
+        sourceDb.TryConnect();
+        targetDb.TryConnect();
+        var tasks = new List<Task>();
+        var tables = sourceDb.GetTableNames().ToArray();
+        foreach (var tblName in tables)
         {
-            var tableName = table.TableName;
-            //if (tableName is not "") continue;
-            Console.WriteLine($"Creating Table: {tableName}");
+            var reader = await sourceDb.CreateDataReader(tblName);
+            var table = new DataTable(tblName);
+            sourceDb.FillSchema(table);
+            targetDb.CreateTable(table);
+
+            #region Loggin
+
+            Console.WriteLine($"Creating Table: {tblName}");
             Console.Write("Columns: ");
             for (var i = 0;;)
             {
@@ -186,35 +201,50 @@ public class SqlServerToMySqlCommand : Command
 
             Console.WriteLine();
 
-            // ReSharper disable once AccessToDisposedClosure
-            targetDb4.CreateTable(table);
+            var rowCount = sourceDb.GetRowCount(tblName);
 
-            if (ignoreTables.Contains(tableName))
+            if (ignoreTables.Contains(tblName.ToLower()))
             {
-                Console.WriteLine($"Ignored table: {tableName}, " +
-                                  // ReSharper disable once AccessToDisposedClosure
-                                  $"this will skip {sourceDb.GetRowCount(tableName)} row\n");
-                return true;
+                Console.WriteLine($"Ignored table: {tblName}, " +
+                                  $"this will skip {rowCount} row\n");
+                continue;
             }
 
             Console.WriteLine($@"Coping table: {table.TableName}");
-            // ReSharper disable once AccessToDisposedClosure
-            Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName):d4}");
+            Console.WriteLine($"Rows Count: {rowCount:d4}");
 
             Console.WriteLine();
 
-            return false;
-        };
+            #endregion
 
-        var queue = new ConcurrentQueue<DataRow>();
-        var tokenSource = new CancellationTokenSource();
-        if (!sourceDb.TryConnect(out e)) throw e;
-        if (!targetDb.TryConnect(out e)) throw e;
-        var fillTask = sourceDb.FillQueueAsync(queue, sourceDb.GetTableNames().ToArray().First(), tokenSource.Token);
-        var peekTask = targetDb.PeekQueueAsync(queue, tokenSource.Token, CancellationToken.None);
+            if (rowCount is 0) continue;
+            totalCount += rowCount;
 
-        await fillTask;
+            while (tasks.Count(i => !(i.IsCompleted | i.IsCanceled | i.IsCompletedSuccessfully)) >= 3)
+            {
+                await Task.Delay(1000, tokenSource.Token);
+            }
+
+            if (tasks.Any(i => i.IsFaulted)) await Task.WhenAll(tasks);
+
+            tasks.Add(targetDb.BulkCopy(tblName, reader));
+        }
+
+        await Task.WhenAll(tasks.ToArray());
         tokenSource.Cancel();
-        await peekTask;
+        await loggingTask;
+        Console.Write($"Success transfer Database {targetDb.ConnectionStringBuilder.Database} for {totalCount} row");
+
+        async Task Logging(CancellationToken token)
+        {
+            for (var prevCount = 0L; !token.IsCancellationRequested; await Task.Delay(0, token))
+            {
+                var currentCount = counter.Values.Sum();
+                if (currentCount == prevCount) continue;
+                Console.WriteLine($"{prevCount}/{totalCount} +{currentCount - prevCount:d5}");
+                Console.SetCursorPosition(0, Console.CursorTop - 1);
+                prevCount = currentCount;
+            }
+        }
     }
 }
