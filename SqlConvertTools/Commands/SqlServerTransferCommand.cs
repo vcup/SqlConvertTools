@@ -3,6 +3,7 @@ using System.Data;
 using Microsoft.Data.SqlClient;
 using SqlConvertTools.DbHandlers;
 using SqlConvertTools.Extensions;
+using SqlConvertTools.Helper;
 
 namespace SqlConvertTools.Commands;
 
@@ -96,11 +97,11 @@ public class SqlServerTransferCommand : Command
         AddOption(ignoreTablesForDatabasesOption);
         AddOption(customDatabaseNamesOption);
 
-        this.SetHandler(content =>
+        this.SetHandler(async content =>
         {
             Func<Argument, object?> va = content.ParseResult.GetValueForArgument;
             Func<Option, object?> vo = content.ParseResult.GetValueForOption;
-            Run((string)va(sourceAddressArgument)!, (string)va(targetAddressArgument)!,
+            await Run((string)va(sourceAddressArgument)!, (string)va(targetAddressArgument)!,
                 (string[])va(transferDatabase)!,
                 (string?)vo(userNameOption), (string?)vo(sourceUserNameOption), (string?)vo(targetUserNameOption),
                 (string?)vo(passwordOption), (string?)vo(sourcePasswordOption), (string?)vo(targetPasswordOption),
@@ -112,7 +113,7 @@ public class SqlServerTransferCommand : Command
         });
     }
 
-    private static void Run(string sourceAddress, string targetAddress, string[] transferDatabase,
+    private static async Task Run(string sourceAddress, string targetAddress, string[] transferDatabase,
         string? userName, string? sourceUserName, string? targetUserName,
         string? password, string? sourcePassword, string? targetPassword,
         string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables,
@@ -154,60 +155,70 @@ public class SqlServerTransferCommand : Command
                 buildIgnoreTable = ignoreTables.Concat(item);
             }
 
-            TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
+            await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
                 buildIgnoreTable.ToArray());
         }
     }
 
-    private static void TransferDatabase(string sourceConnectString, string targetConnectString,
+    private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
         string[] ignoreTables)
     {
-        throw new NotImplementedException();
-        using var sourceDb = new SqlserverHandler(sourceConnectString);
-        using var targetDb = new SqlserverHandler(targetConnectString);
+        ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
+        var sourceDb = new SqlserverHandler(sourceConnectString);
+        var targetDb = new SqlserverHandler(targetConnectString);
 
-        targetDb.TryConnect();
+        var counter = new Dictionary<object, long>();
 
-        var dataSet = new DataSet();
-
-        sourceDb.TryConnect();
-        foreach (var tableName in sourceDb.GetTableNames().ToArray())
+        targetDb.BulkCopyEvent += (sender, args) =>
         {
-            //if (tableName is not "") continue;
-            Console.WriteLine($"Creating Table: {tableName}");
-            sourceDb.FillSchema(tableName, dataSet);
-            var table = dataSet.Tables[tableName] ?? throw new NullReferenceException();
-            Console.Write("Columns: ");
-            for (var i = 0;;)
+            lock (counter)
             {
-                Console.Write('[' + table.Columns[i].ColumnName + ']');
-                if (++i < table.Columns.Count)
-                {
-                    Console.Write(',');
-                    continue;
-                }
-
-                break;
+                counter[sender] = args.RowsCopied;
+                LoggingHelper.CurrentCount = counter.Values.Sum();
             }
+        };
 
-            Console.WriteLine();
+        var tokenSource = new CancellationTokenSource();
+        var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
 
+        {
+            if (!sourceDb.TryConnect(out var e)) throw e;
+        }
+        {
+            if (!targetDb.TryConnect(out var e)) throw e;
+        }
+
+        var tasks = new List<Task>();
+        foreach (var tblName in sourceDb.GetTableNames().ToArray())
+        {
+            var table = new DataTable(tblName);
+            sourceDb.FillSchema(table);
             targetDb.CreateTable(table);
 
-            if (ignoreTables.Contains(tableName))
-            {
-                Console.WriteLine(
-                    $"Ignored table: {tableName}, this will skip {sourceDb.GetRowCount(tableName)} row\n");
-                continue;
-            }
+            var rowCount = sourceDb.GetRowCount(tblName);
+            await LoggingHelper.LogTables(tblName, table, ignoreTables, rowCount);
 
-            Console.WriteLine($@"Coping table: {tableName}");
-            Console.WriteLine($"Rows Count: {sourceDb.GetRowCount(tableName)}");
+            if (rowCount is 0) continue;
+            LoggingHelper.TotalCount += rowCount;
 
-            //sourceDb.FillDataset(tableName, dataSet, out _);
+            if (tasks.Any(i => i.IsFaulted)) await Task.WhenAll(tasks);
 
-            //targetDb.UpdateDatabaseWith(table);
-            Console.WriteLine();
+            var reader = await sourceDb.CreateDataReader(tblName);
+            tasks.Add(targetDb.BulkCopy(tblName, reader));
         }
+
+        await Task.WhenAll(tasks.ToArray());
+        tokenSource.Cancel();
+        try
+        {
+            await loggingTask;
+        }
+        catch (TaskCanceledException)
+        {
+        }
+
+        Console.WriteLine($"Success transfer Database " +
+                          $"{targetDb.ConnectionStringBuilder.InitialCatalog} for {LoggingHelper.TotalCount} row");
+        LoggingHelper.PrevCount = LoggingHelper.CurrentCount = LoggingHelper.TotalCount = 0;
     }
 }
