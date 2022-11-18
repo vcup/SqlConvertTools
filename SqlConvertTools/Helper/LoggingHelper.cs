@@ -5,9 +5,9 @@ namespace SqlConvertTools.Helper;
 public static class LoggingHelper
 {
     private static readonly object LogLock = new();
-    public static long TotalCount;
-    public static long CurrentCount;
-    public static long PrevCount;
+    public static long TotalCount { get; set; }
+    public static long CurrentCount { get; set; }
+    public static long PrevCount { get; set; }
 
     public static async Task LogForCancel(CancellationToken token)
     {
@@ -15,7 +15,7 @@ public static class LoggingHelper
         {
             lock (LogLock)
             {
-                Console.WriteLine($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D4}");
+                Console.WriteLine($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D5}");
                 Console.SetCursorPosition(0, Console.CursorTop - 1);
             }
 

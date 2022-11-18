@@ -164,8 +164,8 @@ public class SqlServerTransferCommand : Command
         string[] ignoreTables)
     {
         ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
-        var sourceDb = new SqlserverHandler(sourceConnectString);
-        var targetDb = new SqlserverHandler(targetConnectString);
+        using var sourceDb = new SqlserverHandler(sourceConnectString);
+        using var targetDb = new SqlserverHandler(targetConnectString);
 
         var counter = new Dictionary<object, long>();
 
@@ -218,7 +218,7 @@ public class SqlServerTransferCommand : Command
         }
 
         Console.WriteLine($"Success transfer Database " +
-                          $"{targetDb.ConnectionStringBuilder.InitialCatalog} for {LoggingHelper.TotalCount} row");
+                          $"{targetDb.ConnectionStringBuilder.InitialCatalog} for {LoggingHelper.TotalCount} row\n");
         LoggingHelper.PrevCount = LoggingHelper.CurrentCount = LoggingHelper.TotalCount = 0;
     }
 }
