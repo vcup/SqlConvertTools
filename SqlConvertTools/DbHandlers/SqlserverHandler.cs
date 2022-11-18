@@ -113,7 +113,7 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
             }
         }
 
-        Connection.ChangeDatabase(dbname);
+        Connection.ChangeDatabase(ConnectionStringBuilder.InitialCatalog = dbname);
     }
 
     public async Task FillQueueAsync(ConcurrentQueue<DataRow> queue, string tableName, CancellationToken token)
@@ -227,8 +227,38 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
         return reader;
     }
 
-    public Task BulkCopy(string tableName, IDataReader reader)
+    public async Task BulkCopy(string tableName, IDataReader reader)
     {
-        throw new NotImplementedException();
+        await using var connection = new SqlConnection(ConnectionStringBuilder.ConnectionString);
+        while (true)
+        {
+            try
+            {
+                // if target Database is just create in a moment, it may report sql exception
+                await connection.OpenAsync();
+            }
+            catch (SqlException)
+            {
+                await Task.Delay(300);
+                continue;
+            }
+
+            break;
+        }
+
+        var bulkCopy = new SqlBulkCopy(connection, SqlBulkCopyOptions.KeepIdentity, null)
+        {
+            DestinationTableName = tableName,
+            NotifyAfter = 51,
+        };
+        bulkCopy.SqlRowsCopied += BulkCopyEvent;
+
+        await bulkCopy.WriteToServerAsync(reader);
+
+        var args = new SqlRowsCopiedEventArgs(bulkCopy.RowsCopied);
+        BulkCopyEvent(bulkCopy, args);
+        reader.Dispose(true);
     }
+
+    public event SqlRowsCopiedEventHandler BulkCopyEvent;
 }
