@@ -193,39 +193,8 @@ public class SqlServerToMySqlCommand : Command
             sourceDb.FillSchema(table);
             targetDb.CreateTable(table);
 
-            #region Loggin
-
-            Console.WriteLine($"Creating Table: {tblName}");
-            Console.Write("Columns: ");
-            for (var i = 0;;)
-            {
-                Console.Write('[' + table.Columns[i].ColumnName + ']');
-                if (++i < table.Columns.Count)
-                {
-                    Console.Write(',');
-                    continue;
-                }
-
-                break;
-            }
-
-            Console.WriteLine();
-
             var rowCount = sourceDb.GetRowCount(tblName);
-
-            if (ignoreTables.Contains(tblName.ToLower()))
-            {
-                Console.WriteLine($"Ignored table: {tblName}, " +
-                                  $"this will skip {rowCount} row\n");
-                continue;
-            }
-
-            Console.WriteLine($@"Coping table: {table.TableName}");
-            Console.WriteLine($"Rows Count: {rowCount:d4}");
-
-            Console.WriteLine();
-
-            #endregion
+            await Logging.LogTables(tblName, table, ignoreTables, rowCount);
 
             if (rowCount is 0) continue;
             Logging.TotalCount += rowCount;
@@ -253,6 +222,7 @@ public class SqlServerToMySqlCommand : Command
 
     private static class Logging
     {
+        private static readonly object LogLock = new();
         public static long TotalCount;
         public static long CurrentCount;
         public static long PrevCount;
@@ -261,11 +231,51 @@ public class SqlServerToMySqlCommand : Command
         {
             while (!token.IsCancellationRequested)
             {
-                Console.WriteLine($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D4}");
-                Console.SetCursorPosition(0, Console.CursorTop - 1);
+                lock (LogLock)
+                {
+                    Console.WriteLine($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D4}");
+                    Console.SetCursorPosition(0, Console.CursorTop - 1);
+                }
                 PrevCount = CurrentCount;
                 await Task.Delay(300, token);
             }
+        }
+
+        public static Task LogTables(string tblName, DataTable table, string[] ignoreTables, int rowCount)
+        {
+            return Task.Run(() =>
+            {
+                lock (LogLock)
+                {
+                    Console.WriteLine($"Creating Table: {tblName}");
+                    Console.Write("Columns: ");
+                    for (var i = 0;;)
+                    {
+                        Console.Write('[' + table.Columns[i].ColumnName + ']');
+                        if (++i < table.Columns.Count)
+                        {
+                            Console.Write(',');
+                            continue;
+                        }
+
+                        break;
+                    }
+
+                    Console.WriteLine();
+
+                    if (ignoreTables.Contains(tblName.ToLower()))
+                    {
+                        Console.WriteLine($"Ignored table: {tblName}, " +
+                                          $"this will skip {rowCount} row\n");
+                        return;
+                    }
+
+                    Console.WriteLine($@"Coping table: {table.TableName}");
+                    Console.WriteLine($"Rows Count: {rowCount:d4}");
+
+                    Console.WriteLine();
+                }
+            });
         }
     }
 }
