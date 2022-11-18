@@ -32,19 +32,13 @@ public static class LoggingHelper
             {
                 Console.WriteLine($"Creating Table: {tblName}");
                 Console.Write("Columns: ");
-                for (var i = 0;;)
+                for (var i = 0; i < table.Columns.Count; i++)
                 {
-                    Console.Write('[' + table.Columns[i].ColumnName + ']');
-                    if (++i < table.Columns.Count)
-                    {
-                        Console.Write(',');
-                        continue;
-                    }
-
-                    break;
+                    Console.Write($"[{table.Columns[i].ColumnName}],");
                 }
 
-                Console.WriteLine();
+                Console.SetCursorPosition(Console.CursorLeft - 1, Console.CursorTop);
+                Console.WriteLine(' ');
 
                 if (ignoreTables.Contains(tblName.ToLower()))
                 {
