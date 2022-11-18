@@ -70,19 +70,11 @@ public static class SqlHelper
                     sql.AppendFormat("decimal(18, 6)");
                     isNumeric = true;
                     break;
-                default:
-
-
-                    if (table.Columns[i].MaxLength is > 4000 or -1)
-                    {
-                        sql.Append(@"nvarchar(MAX)");
-                    }
-                    else
-                    {
-                        sql.Append($@"nvarchar({table.Columns[i].MaxLength})");
-                    }
-
+                case "System.Boolean":
+                    sql.Append("bit");
                     break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
 
             if (table.Columns[i].AutoIncrement)
