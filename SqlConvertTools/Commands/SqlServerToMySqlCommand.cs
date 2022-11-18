@@ -1,8 +1,9 @@
 using System.CommandLine;
 using System.Data;
 using Microsoft.Data.SqlClient;
+using MySqlConnector;
 using SqlConvertTools.DbHandlers;
-using MySqlConnectionStringBuilder = MySql.Data.MySqlClient.MySqlConnectionStringBuilder;
+using SqlConvertTools.Helper;
 
 namespace SqlConvertTools.Commands;
 
@@ -171,12 +172,12 @@ public class SqlServerToMySqlCommand : Command
             lock (counter)
             {
                 counter[sender] = args.RowsCopied;
-                Logging.CurrentCount = counter.Values.Sum();
+                LoggingHelper.CurrentCount = counter.Values.Sum();
             }
         };
 
         var tokenSource = new CancellationTokenSource();
-        var loggingTask = Logging.LogForCancel(tokenSource.Token);
+        var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
 
         {
             if (!sourceDb.TryConnect(out var e)) throw e;
@@ -194,10 +195,10 @@ public class SqlServerToMySqlCommand : Command
             targetDb.CreateTable(table);
 
             var rowCount = sourceDb.GetRowCount(tblName);
-            await Logging.LogTables(tblName, table, ignoreTables, rowCount);
+            await LoggingHelper.LogTables(tblName, table, ignoreTables, rowCount);
 
             if (rowCount is 0) continue;
-            Logging.TotalCount += rowCount;
+            LoggingHelper.TotalCount += rowCount;
 
             if (tasks.Any(i => i.IsFaulted)) await Task.WhenAll(tasks);
 
@@ -216,66 +217,7 @@ public class SqlServerToMySqlCommand : Command
         }
 
         Console.WriteLine($"Success transfer Database " +
-                          $"{targetDb.ConnectionStringBuilder.Database} for {Logging.TotalCount} row");
-        Logging.PrevCount = Logging.CurrentCount = Logging.TotalCount = 0;
-    }
-
-    private static class Logging
-    {
-        private static readonly object LogLock = new();
-        public static long TotalCount;
-        public static long CurrentCount;
-        public static long PrevCount;
-
-        public static async Task LogForCancel(CancellationToken token)
-        {
-            while (!token.IsCancellationRequested)
-            {
-                lock (LogLock)
-                {
-                    Console.WriteLine($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D4}");
-                    Console.SetCursorPosition(0, Console.CursorTop - 1);
-                }
-                PrevCount = CurrentCount;
-                await Task.Delay(300, token);
-            }
-        }
-
-        public static Task LogTables(string tblName, DataTable table, string[] ignoreTables, int rowCount)
-        {
-            return Task.Run(() =>
-            {
-                lock (LogLock)
-                {
-                    Console.WriteLine($"Creating Table: {tblName}");
-                    Console.Write("Columns: ");
-                    for (var i = 0;;)
-                    {
-                        Console.Write('[' + table.Columns[i].ColumnName + ']');
-                        if (++i < table.Columns.Count)
-                        {
-                            Console.Write(',');
-                            continue;
-                        }
-
-                        break;
-                    }
-
-                    Console.WriteLine();
-
-                    if (ignoreTables.Contains(tblName.ToLower()))
-                    {
-                        Console.WriteLine($"Ignored table: {tblName}, " +
-                                          $"this will skip {rowCount} row\n");
-                        return;
-                    }
-
-                    Console.WriteLine($@"Coping table: {table.TableName}");
-                    Console.WriteLine($"Rows Count: {rowCount:d4}");
-
-                    Console.WriteLine();
-                }
-            });
-        }
+                          $"{targetDb.ConnectionStringBuilder.Database} for {LoggingHelper.TotalCount} row");
+        LoggingHelper.PrevCount = LoggingHelper.CurrentCount = LoggingHelper.TotalCount = 0;
     }
 }
