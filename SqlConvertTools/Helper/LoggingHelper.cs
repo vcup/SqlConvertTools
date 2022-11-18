@@ -37,7 +37,7 @@ public static class LoggingHelper
                     Console.Write($"[{table.Columns[i].ColumnName}],");
                 }
 
-                Console.SetCursorPosition(Console.CursorLeft - 1, Console.CursorTop);
+                Console.SetCursorPosition(Console.CursorLeft is 0 ? 0 : Console.CursorLeft - 1, Console.CursorTop);
                 Console.WriteLine(' ');
 
                 if (ignoreTables.Contains(tblName.ToLower()))
