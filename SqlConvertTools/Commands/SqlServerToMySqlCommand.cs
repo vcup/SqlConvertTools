@@ -82,6 +82,8 @@ public class SqlServerToMySqlCommand : Command
             Arity = ArgumentArity.ZeroOrMore,
         };
 
+        var trustSourceOption = new Option<bool>("--trust-source-cert");
+
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
         AddArgument(transferDatabase);
@@ -93,20 +95,22 @@ public class SqlServerToMySqlCommand : Command
         AddOption(ignoreTablesOption);
         AddOption(ignoreTablesForDatabasesOption);
         AddOption(customDatabaseNamesOption);
+        AddOption(trustSourceOption);
 
         this.SetHandler(async content =>
         {
-            Func<Argument, object?> va = content.ParseResult.GetValueForArgument;
-            Func<Option, object?> vo = content.ParseResult.GetValueForOption;
-            await Run((string)va(sourceAddressArgument)!, (string)va(targetAddressArgument)!,
-                (string[])va(transferDatabase)!,
-                (string?)vo(sourceUserNameOption), (string?)vo(targetUserNameOption),
-                (string?)vo(passwordOption), (string?)vo(sourcePasswordOption), (string?)vo(targetPasswordOption),
-                vo(ignoreTablesOption) as string[] ?? Array.Empty<string>(),
-                vo(ignoreTablesForDatabasesOption) as IReadOnlyDictionary<string, IEnumerable<string>> ??
+            await Run(Va(sourceAddressArgument)!, Va(targetAddressArgument)!,
+                Va(transferDatabase)!,
+                Vo(sourceUserNameOption), Vo(targetUserNameOption),
+                Vo(passwordOption), Vo(sourcePasswordOption), Vo(targetPasswordOption),
+                Vo(ignoreTablesOption) ?? Array.Empty<string>(),
+                Vo(ignoreTablesForDatabasesOption) ??
                 new Dictionary<string, IEnumerable<string>>(),
-                vo(customDatabaseNamesOption) as IReadOnlyDictionary<string, string> ??
-                new Dictionary<string, string>());
+                Vo(customDatabaseNamesOption) ??
+                new Dictionary<string, string>(), Vo(trustSourceOption));
+
+            T? Va<T>(Argument<T> o) => content.ParseResult.GetValueForArgument(o);
+            T? Vo<T>(Option<T> o) => content.ParseResult.GetValueForOption(o);
         });
     }
 
@@ -114,7 +118,7 @@ public class SqlServerToMySqlCommand : Command
         string? sourceUserName, string? targetUserName,
         string? password, string? sourcePassword, string? targetPassword,
         string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables,
-        IReadOnlyDictionary<string, string> customDatabaseNames)
+        IReadOnlyDictionary<string, string> customDatabaseNames, bool trustSourceCert)
     {
         var sourceConnStrBuilder = new SqlConnectionStringBuilder
         {
@@ -123,6 +127,7 @@ public class SqlServerToMySqlCommand : Command
             Password = sourcePassword ?? password ??
                 throw new ArgumentException("has not available password for source sqlserver")
         };
+        if (trustSourceCert) sourceConnStrBuilder.TrustServerCertificate = true;
         var targetConnStrBuilder = new MySqlConnectionStringBuilder
         {
             Server = targetAddress,
@@ -180,6 +185,7 @@ public class SqlServerToMySqlCommand : Command
         var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
 
         {
+            sourceDb.ConnectionStringBuilder.TrustServerCertificate = true;
             if (!sourceDb.TryConnect(out var e)) throw e;
         }
         {
