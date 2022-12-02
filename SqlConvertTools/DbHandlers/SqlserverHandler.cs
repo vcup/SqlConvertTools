@@ -256,9 +256,9 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
         await bulkCopy.WriteToServerAsync(reader);
 
         var args = new SqlRowsCopiedEventArgs(bulkCopy.RowsCopied);
-        BulkCopyEvent(bulkCopy, args);
+        BulkCopyEvent?.Invoke(bulkCopy, args);
         reader.Dispose(true);
     }
 
-    public event SqlRowsCopiedEventHandler BulkCopyEvent;
+    public event SqlRowsCopiedEventHandler? BulkCopyEvent;
 }

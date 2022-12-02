@@ -40,7 +40,7 @@ public static class MySqlCommandExtensions
         return reader;
     }
 
-    public static object ExecuteScalar(this MySqlCommand command, string cmdText, bool disposing = true)
+    public static object? ExecuteScalar(this MySqlCommand command, string cmdText, bool disposing = true)
     {
         command.CommandText = cmdText;
         var result = command.ExecuteScalar();

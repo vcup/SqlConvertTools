@@ -237,7 +237,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
     public int GetRowCount(string tableName)
     {
         return (int)Connection.CreateCommand()
-            .ExecuteScalar($"Select COUNT(1) From `{tableName}`");
+            .ExecuteScalar($"Select COUNT(1) From `{tableName}`")!;
     }
 
     public IDbHandler Clone()
@@ -268,7 +268,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
             DestinationTableName = tableName,
             NotifyAfter = 51,
         };
-        bulkCopy.MySqlRowsCopied += (sender, args) => BulkCopyEvent.Invoke(sender, args);
+        bulkCopy.MySqlRowsCopied += BulkCopyEvent;
 
         var result = await bulkCopy.WriteToServerAsync(reader);
 
@@ -279,9 +279,9 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
             .Invoke(Array.Empty<object>());
         var property = type.GetProperty("RowsCopied");
         property!.SetValue(args, result.RowsInserted);
-        BulkCopyEvent(bulkCopy, args);
+        BulkCopyEvent?.Invoke(bulkCopy, args);
         reader.Dispose(true);
     }
 
-    public event MySqlRowsCopiedEventHandler BulkCopyEvent;
+    public event MySqlRowsCopiedEventHandler? BulkCopyEvent;
 }

@@ -120,7 +120,7 @@ public static class SqlHelper
                                 "\nALTER TABLE {0} ADD CONSTRAINT [DF_{0}_{1}]  DEFAULT ({2}) FOR [{1}];",
                                 table.TableName,
                                 table.Columns[i].ColumnName,
-                                xml.GetElementsByTagName("defaultValue")[0].InnerText);
+                                xml.GetElementsByTagName("defaultValue")[0]!.InnerText);
                         }
                         catch
                         {
