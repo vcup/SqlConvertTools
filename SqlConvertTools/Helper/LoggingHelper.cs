@@ -30,7 +30,7 @@ public static class LoggingHelper
         {
             lock (LogLock)
             {
-                Console.WriteLine($"Creating Table: {tblName}");
+                Console.WriteLine($"Creating Table: {tblName}{new string(' ', 12)}");
                 Console.Write("Columns: ");
                 for (var i = 0; i < table.Columns.Count; i++)
                 {
@@ -40,7 +40,7 @@ public static class LoggingHelper
                 Console.SetCursorPosition(Console.CursorLeft is 0 ? 0 : Console.CursorLeft - 1, Console.CursorTop);
                 Console.WriteLine(' ');
 
-                if (ignoreTables.Contains(tblName.ToLower()))
+                if (ignoreTables.Any(i => i.Equals(tblName, StringComparison.OrdinalIgnoreCase)))
                 {
                     Console.WriteLine($"Ignored table: {tblName}, " +
                                       $"this will skip {rowCount} row\n");
