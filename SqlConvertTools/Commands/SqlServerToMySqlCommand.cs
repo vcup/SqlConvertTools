@@ -185,7 +185,6 @@ public class SqlServerToMySqlCommand : Command
         var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
 
         {
-            sourceDb.ConnectionStringBuilder.TrustServerCertificate = true;
             if (!sourceDb.TryConnect(out var e)) throw e;
         }
         {
