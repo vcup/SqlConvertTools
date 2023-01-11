@@ -1,16 +1,18 @@
 # SqlConvertTools
 
-an tools of between sql impls data transfer
+an data transfer tools of between sql implements
 
 ## install
 
 is available on aur
 `yay -S sqlconvert-tools`
 
-## sqlserver to sqlite
+## sqlserver to mysql
 
-use `sqlconvert-tools mssql2sqlite --help` for detail
+use `sqlconvert-tools mssql2mysql --help` for detail
 
-## sqlserver to sqlserver
+## sqlserver between
+
+> haven't well maintained
 
 use `sqlconvert-tools mssql-transfer --help` for detail
