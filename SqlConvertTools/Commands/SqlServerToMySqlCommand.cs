@@ -37,7 +37,7 @@ public class SqlServerToMySqlCommand : Command
         var passwordOption = new Option<string?>(new[] { "--password", "-p" },
             "same as -user, but specify password. Ask user if has not available value");
         var sourcePasswordOption = new Option<string?>(new[] { "--source-password", "--sp" },
-            "same as --source-user, but specify password and override --password. Ask user if has not available value");
+            "same as --source-user, but specify password and override --password. Ask user if has not available value[TODO]");
         var targetPasswordOption = new Option<string?>(new[] { "--target-password", "--tp" },
             "same as --source-password and similar to --target-user");
 
@@ -84,7 +84,7 @@ public class SqlServerToMySqlCommand : Command
             )
         )
         {
-            Description = "Transfer source database as a custom name. Doest affect --ignore-database-tables\n" +
+            Description = "Transfer source database to a custom name. Doesn't affect for --ignore-database-tables\n" +
                           "format -> source_name:dest_name",
             Arity = ArgumentArity.ZeroOrMore,
         };
