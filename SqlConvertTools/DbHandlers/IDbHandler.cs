@@ -23,7 +23,7 @@ public interface IDbHandler
 
     public IEnumerable<string> GetTableNames();
 
-    public void CreateTable(DataTable table);
+    public void CreateTable(DataTable table, bool overrideIfExist = false);
 
     public int GetRowCount(string tableName);
 

@@ -114,6 +114,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
         Connection.ChangeDatabase(ConnectionStringBuilder.Database = dbname);
     }
 
+    [Obsolete("isn't using")]
     public async Task FillQueueAsync(ConcurrentQueue<DataRow> queue, string tableName, CancellationToken token)
     {
         await using var command = Connection.CreateCommand();
@@ -135,6 +136,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
         }
     }
 
+    [Obsolete("isn't using")]
     public async Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token,
         CancellationToken forceToken)
     {
@@ -224,13 +226,20 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
         }
     }
 
-    public void CreateTable(DataTable table)
+    public void CreateTable(DataTable table, bool overrideIfExist = false)
     {
-        using var reader = Connection
-            .CreateCommand()
-            .ExecuteReader($"show tables where `Tables_in_{Connection.Database}` = '{table.TableName}';");
-        if (reader.HasRows) return;
-        reader.Dispose();
+        if (overrideIfExist)
+        {
+            Connection.CreateCommand().ExecuteNonQuery($"DROP Table IF EXISTS {table.TableName}");
+        }
+        else
+        {
+            using var reader = Connection
+                .CreateCommand()
+                .ExecuteReader($"show tables where `Tables_in_{Connection.Database}` = '{table.TableName}';");
+            if (reader.HasRows) return;
+            reader.Dispose();
+        }
         Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSqlForMySql(table));
     }
 
@@ -274,8 +283,8 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
 
         var type = typeof(MySqlRowsCopiedEventArgs);
         var args = (MySqlRowsCopiedEventArgs)type.GetConstructor(
-            BindingFlags.Instance | BindingFlags.NonPublic,
-            Array.Empty<Type>())!
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                Array.Empty<Type>())!
             .Invoke(Array.Empty<object>());
         var property = type.GetProperty("RowsCopied");
         property!.SetValue(args, result.RowsInserted);

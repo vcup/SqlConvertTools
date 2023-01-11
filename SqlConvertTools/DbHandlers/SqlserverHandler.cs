@@ -184,7 +184,7 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
         }
     }
 
-    public void CreateTable(DataTable table)
+    public void CreateTable(DataTable table, bool overrideIfExist = false)
     {
         var exist = (int)Connection
             .CreateCommand()
