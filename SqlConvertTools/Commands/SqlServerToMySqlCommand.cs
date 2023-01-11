@@ -24,7 +24,10 @@ public class SqlServerToMySqlCommand : Command
         var transferDatabase = new Argument<string[]>(Array.Empty<string>)
         {
             Name = "transfer_database",
-            Description = "specify database for transfer"
+            Description = "specify database for transfer\n" +
+                          "use ':' to specify what table will be create and transfer\n" +
+                          "example: dbname:tbl_1:tbl_2 -> only tbl_1 & tbl_2 will create and transfer\n" +
+                          "only specify dbname will transfer all table of db"
         };
         var sourceUserNameOption = new Option<string?>(new[] { "--source-user", "--su" },
             "specify transfer task to used user name for source sqlserver, will override --user");
@@ -143,8 +146,10 @@ public class SqlServerToMySqlCommand : Command
             transferDatabase = dbHandler.GetDatabases().ToArray();
         }
 
-        foreach (var dbname in transferDatabase)
+        foreach (var transferDb in transferDatabase)
         {
+            var dbAndTable = transferDb.Split(':');
+            var (dbname, tblNames) = (dbAndTable[0], dbAndTable[1..]);
             sourceConnStrBuilder.InitialCatalog = targetConnStrBuilder.Database = dbname;
             if (customDatabaseNames.TryGetValue(dbname, out var customDbName))
             {
@@ -158,12 +163,12 @@ public class SqlServerToMySqlCommand : Command
             }
 
             await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
-                buildIgnoreTable.ToArray());
+                buildIgnoreTable.ToArray(), tblNames);
         }
     }
 
     private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
-        string[] ignoreTables)
+        string[] ignoreTables, IReadOnlyCollection<string> tblNames)
     {
         ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
         var sourceDb = new SqlserverHandler(sourceConnectString);
@@ -192,7 +197,11 @@ public class SqlServerToMySqlCommand : Command
         }
 
         var tasks = new List<Task>();
-        var tables = sourceDb.GetTableNames().ToArray();
+        var tables = tblNames.Count is 0
+            ? sourceDb.GetTableNames().ToArray()
+            : sourceDb.GetTableNames()
+                .Intersect(tblNames, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         foreach (var tblName in tables)
         {
             var table = new DataTable(tblName);
