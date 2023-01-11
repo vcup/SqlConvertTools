@@ -42,7 +42,10 @@ public class SqlServerToMySqlCommand : Command
             "same as --source-password and similar to --target-user");
 
         var ignoreTablesOption = new Option<string[]>
-            ("--ignore-tables", "ignore the given tables, but still create them");
+            ("--ignore-tables", "ignore the given tables, but still create them")
+            {
+                AllowMultipleArgumentsPerToken = true,
+            };
         var ignoreTablesForDatabasesOption = new Option<IReadOnlyDictionary<string, IEnumerable<string>>>(
             "--ignore-database-tables",
             result =>
@@ -69,6 +72,7 @@ public class SqlServerToMySqlCommand : Command
             Description = "ignore the given tables, but still create them.\n" +
                           "example -> dbname:tblName:tblName1 => dbname: [tblName, tblName1]",
             Arity = ArgumentArity.ZeroOrMore,
+            AllowMultipleArgumentsPerToken = true,
         };
 
         var customDatabaseNamesOption = new Option<IReadOnlyDictionary<string, string>>(
