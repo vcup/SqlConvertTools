@@ -231,7 +231,7 @@ public class SqlServerToMySqlCommand : Command
         {
             var table = new DataTable(tblName);
             sourceDb.FillSchema(table);
-            targetDb.CreateTable(table);
+            targetDb.CreateTable(table, overrideTableIfExist);
 
             var rowCount = sourceDb.GetRowCount(tblName);
             await LoggingHelper.LogTables(tblName, table, ignoreTables, rowCount);
