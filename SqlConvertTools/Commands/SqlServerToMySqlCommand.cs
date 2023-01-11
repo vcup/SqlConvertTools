@@ -90,6 +90,8 @@ public class SqlServerToMySqlCommand : Command
         };
 
         var trustSourceOption = new Option<bool>("--trust-source-cert");
+        var overrideTableIfExistOption = new Option<bool>
+            ("--override-table", "override table if already exist, it will recreate and transfer");
 
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
@@ -103,6 +105,7 @@ public class SqlServerToMySqlCommand : Command
         AddOption(ignoreTablesForDatabasesOption);
         AddOption(customDatabaseNamesOption);
         AddOption(trustSourceOption);
+        AddOption(overrideTableIfExistOption);
 
         this.SetHandler(async content =>
         {
@@ -114,7 +117,7 @@ public class SqlServerToMySqlCommand : Command
                 Vo(ignoreTablesForDatabasesOption) ??
                 new Dictionary<string, IEnumerable<string>>(),
                 Vo(customDatabaseNamesOption) ??
-                new Dictionary<string, string>(), Vo(trustSourceOption));
+                new Dictionary<string, string>(), Vo(trustSourceOption), Vo(overrideTableIfExistOption));
 
             T? Va<T>(Argument<T> o) => content.ParseResult.GetValueForArgument(o);
             T? Vo<T>(Option<T> o) => content.ParseResult.GetValueForOption(o);
@@ -125,7 +128,7 @@ public class SqlServerToMySqlCommand : Command
         string? sourceUserName, string? targetUserName,
         string? password, string? sourcePassword, string? targetPassword,
         string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables,
-        IReadOnlyDictionary<string, string> customDatabaseNames, bool trustSourceCert)
+        IReadOnlyDictionary<string, string> customDatabaseNames, bool trustSourceCert, bool overrideTableIfExist)
     {
         var sourceConnStrBuilder = new SqlConnectionStringBuilder
         {
@@ -167,12 +170,12 @@ public class SqlServerToMySqlCommand : Command
             }
 
             await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
-                buildIgnoreTable.ToArray(), tblNames);
+                buildIgnoreTable.ToArray(), tblNames, overrideTableIfExist);
         }
     }
 
     private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
-        string[] ignoreTables, IReadOnlyCollection<string> tblNames)
+        string[] ignoreTables, IReadOnlyCollection<string> tblNames, bool overrideTableIfExist)
     {
         ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
         var sourceDb = new SqlserverHandler(sourceConnectString);
@@ -180,7 +183,7 @@ public class SqlServerToMySqlCommand : Command
         targetDb.ConnectionStringBuilder.AllowLoadLocalInfile = true;
 
         var counter = new Dictionary<object, long>();
-
+        // collect copied rows count
         targetDb.BulkCopyEvent += (sender, args) =>
         {
             lock (counter)
@@ -190,9 +193,6 @@ public class SqlServerToMySqlCommand : Command
             }
         };
 
-        var tokenSource = new CancellationTokenSource();
-        var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
-
         {
             if (!sourceDb.TryConnect(out var e)) throw e;
         }
@@ -200,12 +200,33 @@ public class SqlServerToMySqlCommand : Command
             if (!targetDb.TryConnect(out var e)) throw e;
         }
 
-        var tasks = new List<Task>();
         var tables = tblNames.Count is 0
             ? sourceDb.GetTableNames().ToArray()
             : sourceDb.GetTableNames()
                 .Intersect(tblNames, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+        if (overrideTableIfExist)
+        {
+            var overrideTables = targetDb.GetTableNames()
+                .Intersect(tables, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (overrideTables.Length is not 0)
+            {
+                Console.WriteLine("showing below tables will be override:");
+                foreach (var overrideTable in overrideTables)
+                {
+                    Console.WriteLine($"- {overrideTable}");
+                }
+
+                Console.WriteLine("did you sure? (yes/no)");
+                if (Console.ReadLine()?.ToLower() is not "yes") return;
+            }
+        }
+
+        var tokenSource = new CancellationTokenSource();
+        var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
+
+        var tasks = new List<Task>();
         foreach (var tblName in tables)
         {
             var table = new DataTable(tblName);
