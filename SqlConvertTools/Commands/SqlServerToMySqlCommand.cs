@@ -236,7 +236,7 @@ public class SqlServerToMySqlCommand : Command
             var rowCount = sourceDb.GetRowCount(tblName);
             await LoggingHelper.LogTables(tblName, table, ignoreTables, rowCount);
 
-            if (rowCount is 0) continue;
+            if (rowCount is 0 || ignoreTables.Contains(tblName, StringComparer.OrdinalIgnoreCase)) continue;
             LoggingHelper.TotalCount += rowCount;
 
             if (tasks.Any(i => i.IsFaulted)) await Task.WhenAll(tasks);
