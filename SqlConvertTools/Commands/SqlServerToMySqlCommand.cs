@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.CommandLine;
 using System.Data;
 using Microsoft.Data.SqlClient;
@@ -183,15 +184,12 @@ public class SqlServerToMySqlCommand : Command
         var targetDb = new MysqlHandler(targetConnectString);
         targetDb.ConnectionStringBuilder.AllowLoadLocalInfile = true;
 
-        var counter = new Dictionary<object, long>();
+        var counter = new ConcurrentDictionary<object, long>();
         // collect copied rows count
         targetDb.BulkCopyEvent += (sender, args) =>
         {
-            lock (counter)
-            {
-                counter[sender] = args.RowsCopied;
-                LoggingHelper.CurrentCount = counter.Values.Sum();
-            }
+            counter[sender] = args.RowsCopied;
+            LoggingHelper.CurrentCount = counter.Values.Sum();
         };
 
         {
