@@ -184,14 +184,6 @@ public class SqlServerToMySqlCommand : Command
         var targetDb = new MysqlHandler(targetConnectString);
         targetDb.ConnectionStringBuilder.AllowLoadLocalInfile = true;
 
-        var counter = new ConcurrentDictionary<object, long>();
-        // collect copied rows count
-        targetDb.BulkCopyEvent += (sender, args) =>
-        {
-            counter[sender] = args.RowsCopied;
-            LoggingHelper.CurrentCount = counter.Values.Sum();
-        };
-
         {
             if (!sourceDb.TryConnect(out var e)) throw e;
         }
@@ -224,6 +216,14 @@ public class SqlServerToMySqlCommand : Command
 
         var tokenSource = new CancellationTokenSource();
         var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
+
+        var counter = new ConcurrentDictionary<object, long>();
+        // collect copied rows count
+        targetDb.BulkCopyEvent += (sender, args) =>
+        {
+            counter[sender] = args.RowsCopied;
+            LoggingHelper.CurrentCount = counter.Values.Sum();
+        };
 
         var tasks = new List<Task>();
         foreach (var tblName in tables)
