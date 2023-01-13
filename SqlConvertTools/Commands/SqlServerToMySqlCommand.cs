@@ -87,6 +87,7 @@ public class SqlServerToMySqlCommand : Command
             Description = "Transfer source database to a custom name. Doesn't affect for --ignore-database-tables\n" +
                           "format -> source_name:dest_name",
             Arity = ArgumentArity.ZeroOrMore,
+            AllowMultipleArgumentsPerToken = true,
         };
 
         var trustSourceOption = new Option<bool>("--trust-source-cert");
