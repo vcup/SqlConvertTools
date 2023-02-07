@@ -217,6 +217,7 @@ public class SqlServerToMySqlCommand : Command
         var tokenSource = new CancellationTokenSource();
         var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
 
+        var totalCount = 0L;
         var counter = new ConcurrentDictionary<object, long>();
         // collect copied rows count
         targetDb.BulkCopyEvent += (sender, args) =>
@@ -236,7 +237,7 @@ public class SqlServerToMySqlCommand : Command
             await LoggingHelper.LogTables(tblName, table, ignoreTables, rowCount);
 
             if (rowCount is 0 || ignoreTables.Contains(tblName, StringComparer.OrdinalIgnoreCase)) continue;
-            LoggingHelper.TotalCount += rowCount;
+            totalCount += LoggingHelper.TotalCount += rowCount;
 
             if (tasks.Any(i => i.IsFaulted)) await Task.WhenAll(tasks);
 
@@ -255,7 +256,6 @@ public class SqlServerToMySqlCommand : Command
         }
 
         Console.WriteLine($"Success transfer Database " +
-                          $"{targetDb.ConnectionStringBuilder.Database} for {LoggingHelper.TotalCount} row");
-        LoggingHelper.PrevCount = LoggingHelper.CurrentCount = LoggingHelper.TotalCount = 0;
+                          $"{targetDb.ConnectionStringBuilder.Database} for {totalCount} row");
     }
 }
