@@ -281,6 +281,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
 
         var result = await bulkCopy.WriteToServerAsync(reader);
 
+        // make sure all of copied rows can raise after bulk copy task end
         var type = typeof(MySqlRowsCopiedEventArgs);
         var args = (MySqlRowsCopiedEventArgs)type.GetConstructor(
                 BindingFlags.Instance | BindingFlags.NonPublic,
