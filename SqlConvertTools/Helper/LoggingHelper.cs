@@ -9,14 +9,16 @@ public static class LoggingHelper
     public static long CurrentCount { get; set; }
     public static long PrevCount { get; set; }
 
+    public static string CurrentTableName { get; set; } = string.Empty;
+
     public static async Task LogForCancel(CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
             lock (LogLock)
             {
-                Console.WriteLine($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D5}");
-                Console.SetCursorPosition(0, Console.CursorTop - 1);
+                Console.Write($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D5} ~[{CurrentTableName}]");
+                Console.SetCursorPosition(0, Console.CursorTop);
             }
 
             PrevCount = CurrentCount;

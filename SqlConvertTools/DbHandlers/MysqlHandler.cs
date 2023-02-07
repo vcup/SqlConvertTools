@@ -6,6 +6,7 @@ using System.Reflection;
 using MySqlConnector;
 using SqlConvertTools.Extensions;
 using SqlConvertTools.Helper;
+using SqlConvertTools.Utils;
 
 namespace SqlConvertTools.DbHandlers;
 
@@ -285,7 +286,15 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
             DestinationTableName = tableName,
             NotifyAfter = 51,
         };
-        bulkCopy.MySqlRowsCopied += BulkCopyEvent;
+        var eventArgs = new DbHandleBulkRowsCopiedEventArgs<MySqlRowsCopiedEventArgs>()
+        {
+            TableName = tableName
+        };
+        bulkCopy.MySqlRowsCopied += (sender, args) =>
+        {
+            eventArgs.EventArguments = args;
+            BulkCopyEvent?.Invoke(sender, eventArgs);
+        };
 
         var result = await bulkCopy.WriteToServerAsync(reader);
 
@@ -297,9 +306,11 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
             .Invoke(Array.Empty<object>());
         var property = type.GetProperty("RowsCopied");
         property!.SetValue(args, result.RowsInserted);
-        BulkCopyEvent?.Invoke(bulkCopy, args);
+
+        eventArgs.EventArguments = args;
+        BulkCopyEvent?.Invoke(bulkCopy, eventArgs);
         reader.Dispose(true);
     }
 
-    public event MySqlRowsCopiedEventHandler? BulkCopyEvent;
+    public event DbHandleBulkRowsCopiedEventHandler<MySqlRowsCopiedEventArgs>? BulkCopyEvent;
 }

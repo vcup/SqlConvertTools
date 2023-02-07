@@ -182,6 +182,7 @@ public class SqlServerToMySqlCommand : Command
         ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
         var sourceDb = new SqlserverHandler(sourceConnectString);
         var targetDb = new MysqlHandler(targetConnectString);
+        // bulk copy required
         targetDb.ConnectionStringBuilder.AllowLoadLocalInfile = true;
 
         {
@@ -222,8 +223,9 @@ public class SqlServerToMySqlCommand : Command
         // collect copied rows count
         targetDb.BulkCopyEvent += (sender, args) =>
         {
-            counter[sender] = args.RowsCopied;
+            counter[sender] = args.EventArguments.RowsCopied;
             LoggingHelper.CurrentCount = counter.Values.Sum();
+            LoggingHelper.CurrentTableName = args.TableName;
         };
 
         var tasks = new List<Task>();
