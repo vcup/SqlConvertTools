@@ -40,6 +40,10 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
 
     private SqlConnection Connection => _connection ??= new SqlConnection(ConnectionStringBuilder.ConnectionString);
 
+    /// <summary>
+    /// try to connect to database, default database using 'master'
+    /// </summary>
+    /// <inheritdoc/>
     public bool TryConnect(bool fallback = true)
     {
         try
@@ -69,6 +73,10 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
         return flag;
     }
 
+    /// <summary>
+    /// try to connect to database, default database using 'master' for <paramref name="fallback"/>
+    /// </summary>
+    /// <inheritdoc/>
     public bool TryConnect([NotNullWhen(false)] out DbException? exception, bool fallback = true)
     {
         try

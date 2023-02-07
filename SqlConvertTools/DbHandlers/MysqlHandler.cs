@@ -39,6 +39,10 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
 
     public MySqlConnection Connection => _connection ??= new MySqlConnection(ConnectionStringBuilder.ConnectionString);
 
+    /// <summary>
+    /// try to connect to database, default database using 'mysql' for <paramref name="fallback"/>
+    /// </summary>
+    /// <inheritdoc/>
     public bool TryConnect(bool fallback = true)
     {
         try
@@ -68,6 +72,10 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
         return flag;
     }
 
+    /// <summary>
+    /// try to connect to database, default database using 'mysql' for <paramref name="fallback"/>
+    /// </summary>
+    /// <inheritdoc/>
     public bool TryConnect([NotNullWhen(false)] out DbException? exception, bool fallback = true)
     {
         try

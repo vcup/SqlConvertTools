@@ -255,7 +255,7 @@ public class SqlServerToMySqlCommand : Command
         {
         }
 
-        Console.WriteLine($"Success transfer Database " +
+        Console.WriteLine("Success transfer Database " +
                           $"{targetDb.ConnectionStringBuilder.Database} for {totalCount} row");
     }
 }
