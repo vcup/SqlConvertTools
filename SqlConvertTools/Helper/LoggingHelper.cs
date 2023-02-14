@@ -12,13 +12,15 @@ public static class LoggingHelper
 
     public static string CurrentTableName { get; set; } = string.Empty;
 
+    public static Task[] InCompleteTasks { get; set; } = Array.Empty<Task>();
+
     public static async Task LogForCancel(CancellationToken token)
     {
         var str = new StringBuilder(Console.WindowWidth);
         var prevLoggedLength = 0;
         while (!token.IsCancellationRequested)
         {
-            str.Append($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D5} ~[{CurrentTableName}]");
+            str.Append($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D5} ~[{CurrentTableName}] |{InCompleteTasks.Length}|");
             if (str.Length < prevLoggedLength) str.Append(' ', prevLoggedLength - str.Length);
 
             lock (LogLock)
