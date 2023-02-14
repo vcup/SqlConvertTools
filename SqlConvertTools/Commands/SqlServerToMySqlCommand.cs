@@ -95,7 +95,10 @@ public class SqlServerToMySqlCommand : Command
         var overrideTableIfExistOption = new Option<bool>
             ("--override-table", "override table if already exist, it will recreate and transfer");
         var parallelTablesTransferOption = new Option<int>
-            ("--parallel-table-transfers", "specify how many tables transfer in same time");
+            ("--parallel-table-transfers", () => 3)
+            {
+                Description = "specify how many tables transfer in same time"
+            };
 
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
