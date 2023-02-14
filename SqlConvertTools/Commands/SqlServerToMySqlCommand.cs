@@ -245,7 +245,7 @@ public class SqlServerToMySqlCommand : Command
 
             var reader = await sourceDb.CreateDataReader(tblName);
             var inCompleteTasks = tasks.Where(i => !i.IsCompleted).ToArray();
-            if (inCompleteTasks.Length > 3) await inCompleteTasks.Last(i => !i.IsCompleted);
+            if (inCompleteTasks.Length > 3) await Task.WhenAny(inCompleteTasks);
             tasks.Add(targetDb.BulkCopy(tblName, reader));
         }
 
