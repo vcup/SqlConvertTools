@@ -170,6 +170,7 @@ public static class SqlHelper
         var sql = new StringBuilder($"Create Table `{table.TableName}` (");
         sql.Append('\n');
 
+        var rowTotalSize = 0;
         foreach (DataColumn column in table.Columns)
         {
             sql.Append($"\t`{column.ColumnName}`");
@@ -209,6 +210,9 @@ public static class SqlHelper
 
         string NetTypeMapToMySqlDataType(DataColumn column)
         {
+            // avoid Row size too large.
+            // reference https://mariadb.com/kb/en/troubleshooting-row-size-too-large-errors-with-innodb/
+            rowTotalSize += column.MaxLength;
             switch (column.DataType.FullName)
             {
                 case "System.Boolean":
@@ -237,7 +241,10 @@ public static class SqlHelper
                 case "System.Single":
                     return "float";
                 case "System.String":
-                    return column.MaxLength is > 4000 or -1 ? "longtext" : $"varchar({column.MaxLength})";
+                    return rowTotalSize + column.MaxLength > 15000
+                           || column.MaxLength is > 4000 or -1
+                        ? "longtext"
+                        : $"varchar({column.MaxLength})";
                 case "System.TimeSpan":
                     return "time";
                 default:
