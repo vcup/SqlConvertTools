@@ -223,7 +223,7 @@ public class SqlServerToMySqlCommand : Command
         // collect copied rows count
         targetDb.BulkCopyEvent += (sender, args) =>
         {
-            counter[sender] = args.EventArguments.RowsCopied;
+            counter[sender] = args.EventArguments!.RowsCopied;
             LoggingHelper.CurrentCount = counter.Values.Sum();
             LoggingHelper.CurrentTableName = args.TableName;
         };
