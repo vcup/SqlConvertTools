@@ -244,6 +244,7 @@ public class SqlServerToMySqlCommand : Command
             if (tasks.Any(i => i.IsFaulted)) await Task.WhenAll(tasks);
 
             var reader = await sourceDb.CreateDataReader(tblName);
+            if (tasks.Count > 3) await tasks.Last(i => !i.IsCompleted);
             tasks.Add(targetDb.BulkCopy(tblName, reader));
         }
 
