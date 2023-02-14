@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text;
 
 namespace SqlConvertTools.Helper;
 
@@ -13,15 +14,22 @@ public static class LoggingHelper
 
     public static async Task LogForCancel(CancellationToken token)
     {
+        var str = new StringBuilder(Console.WindowWidth);
+        var prevLoggedLength = 0;
         while (!token.IsCancellationRequested)
         {
+            str.Append($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D5} ~[{CurrentTableName}]");
+            if (str.Length < prevLoggedLength) str.Append(' ', prevLoggedLength - str.Length);
+
             lock (LogLock)
             {
-                Console.Write($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D5} ~[{CurrentTableName}]");
+                Console.Write(str.ToString());
                 Console.SetCursorPosition(0, Console.CursorTop);
+                prevLoggedLength = str.Length;
             }
 
             PrevCount = CurrentCount;
+            str.Clear();
             await Task.Delay(300, token);
         }
     }
