@@ -6,6 +6,8 @@ using Microsoft.Data.SqlClient;
 using MySqlConnector;
 using SqlConvertTools.DbHandlers;
 using SqlConvertTools.Helper;
+using SqlConvertTools.Utils;
+using static SqlConvertTools.Helper.ParsedOptions;
 
 namespace SqlConvertTools.Commands;
 
@@ -115,45 +117,46 @@ public class SqlServerToMySqlCommand : Command
         AddOption(trustSourceOption);
         AddOption(overrideTableIfExistOption);
         AddOption(parallelTablesTransferOption);
+        AddOption(customColumnDataTypeOption);
 
         this.SetHandler(async content =>
         {
+            SourceUserName = Vo(sourceUserNameOption);
+            TargetUserName = Vo(targetUserNameOption);
+            Password = Vo(passwordOption);
+            SourcePassword = Vo(sourcePasswordOption);
+            TargetPassword = Vo(targetPasswordOption);
+            IgnoreTables = Vo(ignoreTablesOption) ?? Array.Empty<string>();
+            IgnoreDatabaseTables = Vo(ignoreTablesForDatabasesOption) ??
+                                                 new Dictionary<string, IEnumerable<string>>();
+            CustomDatabaseNames = Vo(customDatabaseNamesOption) ?? new Dictionary<string, string>();
+            TrustSourceCert = Vo(trustSourceOption);
+            OverrideTableIfExist = Vo(overrideTableIfExistOption);
+            ParallelTablesTransfer = Vo(parallelTablesTransferOption);
+
             await Run(Va(sourceAddressArgument)!, Va(targetAddressArgument)!,
-                Va(transferDatabase)!,
-                Vo(sourceUserNameOption), Vo(targetUserNameOption),
-                Vo(passwordOption), Vo(sourcePasswordOption), Vo(targetPasswordOption),
-                Vo(ignoreTablesOption) ?? Array.Empty<string>(),
-                Vo(ignoreTablesForDatabasesOption) ??
-                new Dictionary<string, IEnumerable<string>>(),
-                Vo(customDatabaseNamesOption) ??
-                new Dictionary<string, string>(), Vo(trustSourceOption), Vo(overrideTableIfExistOption),
-                Vo(parallelTablesTransferOption));
+                Va(transferDatabase)!);
 
             T? Va<T>(Argument<T> o) => content.ParseResult.GetValueForArgument(o);
             T? Vo<T>(Option<T> o) => content.ParseResult.GetValueForOption(o);
         });
     }
 
-    private static async Task Run(string sourceAddress, string targetAddress, string[] transferDatabase,
-        string? sourceUserName, string? targetUserName,
-        string? password, string? sourcePassword, string? targetPassword,
-        string[] ignoreTables, IReadOnlyDictionary<string, IEnumerable<string>> ignoreDatabaseTables,
-        IReadOnlyDictionary<string, string> customDatabaseNames, bool trustSourceCert, bool overrideTableIfExist,
-        int parallelTablesTransfer)
+    private static async Task Run(string sourceAddress, string targetAddress, string[] transferDatabase)
     {
         var sourceConnStrBuilder = new SqlConnectionStringBuilder
         {
             DataSource = sourceAddress,
-            UserID = sourceUserName ?? "sa",
-            Password = sourcePassword ?? password ??
+            UserID = SourceUserName ?? "sa",
+            Password = SourcePassword ?? Password ??
                 throw new ArgumentException("has not available password for source sqlserver")
         };
-        if (trustSourceCert) sourceConnStrBuilder.TrustServerCertificate = true;
+        if (TrustSourceCert) sourceConnStrBuilder.TrustServerCertificate = true;
         var targetConnStrBuilder = new MySqlConnectionStringBuilder
         {
             Server = targetAddress,
-            UserID = targetUserName ?? "root",
-            Password = targetPassword ?? password ??
+            UserID = TargetUserName ?? "root",
+            Password = TargetPassword ?? Password ??
                 throw new ArgumentException("has not available password for target sqlserver")
         };
         if (!transferDatabase.Any())
@@ -178,25 +181,24 @@ public class SqlServerToMySqlCommand : Command
                 .Select(i => new Regex(i, dbTblRegexOptions))
                 .ToArray());
             sourceConnStrBuilder.InitialCatalog = targetConnStrBuilder.Database = dbname;
-            if (customDatabaseNames.TryGetValue(dbname, out var customDbName))
+            if (CustomDatabaseNames.TryGetValue(dbname, out var customDbName))
             {
                 targetConnStrBuilder.Database = customDbName;
             }
 
-            IEnumerable<string> buildIgnoreTable = ignoreTables;
-            if (ignoreDatabaseTables.TryGetValue(dbname, out var item))
+            IEnumerable<string> buildIgnoreTable = IgnoreTables;
+            if (IgnoreDatabaseTables.TryGetValue(dbname, out var item))
             {
-                buildIgnoreTable = ignoreTables.Concat(item);
+                buildIgnoreTable = IgnoreTables.Concat(item);
             }
 
             await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
-                buildIgnoreTable.ToArray(), tblNameMatchers, overrideTableIfExist, parallelTablesTransfer);
+                buildIgnoreTable.ToArray(), tblNameMatchers);
         }
     }
 
     private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
-        string[] ignoreTables, IReadOnlyCollection<Regex> tblNameMatchers, bool overrideTableIfExist,
-        int parallelTasks)
+        string[] ignoreTables, IReadOnlyCollection<Regex> tblNameMatchers)
     {
         ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
         var sourceDb = new SqlserverHandler(sourceConnectString);
@@ -216,7 +218,7 @@ public class SqlServerToMySqlCommand : Command
             : sourceDb.GetTableNames()
                 .Where(i => tblNameMatchers.Any(j => j.IsMatch(i)))
                 .ToArray();
-        if (overrideTableIfExist)
+        if (OverrideTableIfExist)
         {
             var overrideTables = targetDb.GetTableNames()
                 .Intersect(tables, StringComparer.OrdinalIgnoreCase)
@@ -252,7 +254,7 @@ public class SqlServerToMySqlCommand : Command
         {
             var table = new DataTable(tblName);
             sourceDb.FillSchema(table);
-            targetDb.CreateTable(table, overrideTableIfExist);
+            targetDb.CreateTable(table, OverrideTableIfExist);
 
             var rowCount = sourceDb.GetRowCount(tblName);
             await LoggingHelper.LogTables(tblName, table, ignoreTables, rowCount);
@@ -264,7 +266,7 @@ public class SqlServerToMySqlCommand : Command
 
             var reader = await sourceDb.CreateDataReader(tblName);
             LoggingHelper.InCompleteTasks = tasks.Where(i => !i.IsCompleted).ToArray();
-            if (LoggingHelper.InCompleteTasks.Length == parallelTasks) await Task.WhenAny(LoggingHelper.InCompleteTasks);
+            if (LoggingHelper.InCompleteTasks.Length == ParallelTablesTransfer) await Task.WhenAny(LoggingHelper.InCompleteTasks);
             tasks.Add(targetDb.BulkCopy(tblName, reader));
         }
 
