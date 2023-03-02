@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.CommandLine;
 using System.Data;
+using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
 using MySqlConnector;
 using SqlConvertTools.DbHandlers;
@@ -165,8 +166,17 @@ public class SqlServerToMySqlCommand : Command
 
         foreach (var transferDb in transferDatabase)
         {
-            var dbAndTable = transferDb.Split(':');
-            var (dbname, tblNames) = (dbAndTable[0], dbAndTable[1..]);
+            const RegexOptions dbTblRegexOptions =
+                RegexOptions.Compiled
+                | RegexOptions.Singleline
+                | RegexOptions.IgnoreCase
+                | RegexOptions.CultureInvariant;
+            var dbAndTable = transferDb.Replace("(?:", "(?$%$", StringComparison.Ordinal)
+                .Split(':', StringSplitOptions.RemoveEmptyEntries);
+            var (dbname, tblNameMatchers) = (dbAndTable[0], dbAndTable.Skip(1)
+                .Select(i => i.Replace("(?$%$", "(?:", StringComparison.Ordinal))
+                .Select(i => new Regex(i, dbTblRegexOptions))
+                .ToArray());
             sourceConnStrBuilder.InitialCatalog = targetConnStrBuilder.Database = dbname;
             if (customDatabaseNames.TryGetValue(dbname, out var customDbName))
             {
@@ -180,12 +190,12 @@ public class SqlServerToMySqlCommand : Command
             }
 
             await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
-                buildIgnoreTable.ToArray(), tblNames, overrideTableIfExist, parallelTablesTransfer);
+                buildIgnoreTable.ToArray(), tblNameMatchers, overrideTableIfExist, parallelTablesTransfer);
         }
     }
 
     private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
-        string[] ignoreTables, IReadOnlyCollection<string> tblNames, bool overrideTableIfExist,
+        string[] ignoreTables, IReadOnlyCollection<Regex> tblNameMatchers, bool overrideTableIfExist,
         int parallelTasks)
     {
         ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
@@ -201,10 +211,10 @@ public class SqlServerToMySqlCommand : Command
             if (!targetDb.TryConnect(out var e)) throw e;
         }
 
-        var tables = tblNames.Count is 0
+        var tables = tblNameMatchers.Count is 0
             ? sourceDb.GetTableNames().ToArray()
             : sourceDb.GetTableNames()
-                .Intersect(tblNames, StringComparer.OrdinalIgnoreCase)
+                .Where(i => tblNameMatchers.Any(j => j.IsMatch(i)))
                 .ToArray();
         if (overrideTableIfExist)
         {
