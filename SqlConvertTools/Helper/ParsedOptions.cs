@@ -1,3 +1,5 @@
+using SqlConvertTools.Utils;
+
 namespace SqlConvertTools.Helper;
 
 internal static class ParsedOptions
@@ -23,4 +25,6 @@ internal static class ParsedOptions
     public static bool OverrideTableIfExist { get; set; }
 
     public static int ParallelTablesTransfer { get; set; }
+
+    public static IReadOnlyCollection<CustomColumnDataType> CustomColumnDataTypes { get; set; } = null!;
 }

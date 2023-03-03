@@ -103,6 +103,24 @@ public class SqlServerToMySqlCommand : Command
                 Description = "specify how many tables transfer in same time"
             };
 
+        var customColumnDataTypeOption = new Option<IReadOnlyCollection<CustomColumnDataType>>(
+            "--column-type",
+            result => result.Tokens
+                .Select(i => i.Value.Split(':', StringSplitOptions.RemoveEmptyEntries))
+                .Where(i => i.Length > 2)
+                .Select(i => new CustomColumnDataType
+                {
+                    DataType = i[^1],
+                    Column = i[^2],
+                    Table = i.Length > 2 ? i[^3] : null,
+                    Database = i.Length > 3 ? i[^4] : null,
+                })
+                .ToArray()
+            )
+        {
+            Description = "custom some column data type, usage: '[[dbname:]table:]column:bitint'\n"
+        };
+
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
         AddArgument(transferDatabase);
@@ -133,6 +151,7 @@ public class SqlServerToMySqlCommand : Command
             TrustSourceCert = Vo(trustSourceOption);
             OverrideTableIfExist = Vo(overrideTableIfExistOption);
             ParallelTablesTransfer = Vo(parallelTablesTransferOption);
+            CustomColumnDataTypes = Vo(customColumnDataTypeOption) ?? Array.Empty<CustomColumnDataType>();
 
             await Run(Va(sourceAddressArgument)!, Va(targetAddressArgument)!,
                 Va(transferDatabase)!);
@@ -250,9 +269,11 @@ public class SqlServerToMySqlCommand : Command
         };
 
         var tasks = new List<Task>();
+        var dbSet = new DataSet(sourceDb.ConnectionStringBuilder.InitialCatalog);
         foreach (var tblName in tables)
         {
             var table = new DataTable(tblName);
+            dbSet.Tables.Add(table);
             sourceDb.FillSchema(table);
             targetDb.CreateTable(table, OverrideTableIfExist);
 

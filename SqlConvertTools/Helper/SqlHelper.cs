@@ -174,7 +174,7 @@ public static class SqlHelper
         foreach (DataColumn column in table.Columns)
         {
             sql.Append($"\t`{column.ColumnName}`");
-            sql.Append($" {NetTypeMapToMySqlDataType(column)} ");
+            sql.Append($" {GetCustomDataType(column) ?? NetTypeMapToMySqlDataType(column)} ");
             if (column.AutoIncrement) sql.Append("AUTO_INCREMENT ");
             if (column.AutoIncrementSeed is not 0) sql.Append($"= {column.AutoIncrementSeed}");
             if (!column.AllowDBNull && column.DefaultValue is not { })
@@ -207,6 +207,16 @@ public static class SqlHelper
         sql.AppendLine("\n);");
 
         return sql.ToString();
+
+        string? GetCustomDataType(DataColumn column)
+        {
+            var customDataType = ParsedOptions.CustomColumnDataTypes
+                .FirstOrDefault(i =>
+                    i.Column == column.ColumnName
+                    && (i.Table is null || i.Table == column.Table!.TableName)
+                    && (i.Database is null || i.Database == column.Table!.DataSet!.DataSetName));
+            return customDataType?.DataType;
+        }
 
         string NetTypeMapToMySqlDataType(DataColumn column)
         {
