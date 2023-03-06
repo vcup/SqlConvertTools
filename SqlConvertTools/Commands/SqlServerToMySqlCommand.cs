@@ -118,8 +118,11 @@ public class SqlServerToMySqlCommand : Command
                 .ToArray()
             )
         {
-            Description = "custom some column data type, usage: '[[dbname:]table:]column:bitint'\n"
+            Description = "custom some column data type, usage: '[[dbname:]table:]column:bitint'\n",
+            Arity = ArgumentArity.ZeroOrMore,
+            AllowMultipleArgumentsPerToken = true,
         };
+        customColumnDataTypeOption.SetDefaultValue(Array.Empty<CustomColumnDataType>());
 
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
@@ -151,7 +154,7 @@ public class SqlServerToMySqlCommand : Command
             TrustSourceCert = Vo(trustSourceOption);
             OverrideTableIfExist = Vo(overrideTableIfExistOption);
             ParallelTablesTransfer = Vo(parallelTablesTransferOption);
-            CustomColumnDataTypes = Vo(customColumnDataTypeOption) ?? Array.Empty<CustomColumnDataType>();
+            CustomColumnDataTypes = Vo(customColumnDataTypeOption)!;
 
             await Run(Va(sourceAddressArgument)!, Va(targetAddressArgument)!,
                 Va(transferDatabase)!);
