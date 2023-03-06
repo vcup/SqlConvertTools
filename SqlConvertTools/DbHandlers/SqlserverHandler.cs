@@ -111,13 +111,16 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
 
     public void ChangeDatabase(string dbname)
     {
-        using (var reader = Connection.CreateCommand()
+        var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
+        using (var reader = command
                    .ExecuteReader(@$"Select name From sys.databases Where database_id > 4 And name = '{dbname}'"))
         {
             if (dbname is not "master" && !reader.HasRows)
             {
                 reader.Dispose();
-                Connection.CreateCommand().ExecuteNonQuery($"Create Database {dbname}");
+                command = Connection.CreateCommand();
+                command.ExecuteNonQuery($"Create Database {dbname}");
             }
         }
 
@@ -127,6 +130,7 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
     public async Task FillQueueAsync(ConcurrentQueue<DataRow> queue, string tableName, CancellationToken token)
     {
         await using var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
         var table = new DataTable(tableName);
         FillSchema(table);
 
@@ -154,6 +158,7 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
     {
         dataSet ??= new DataSet();
         using var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
         command.CommandText = $@"Select * From [{tableName}]";
         command.CommandType = CommandType.Text;
 
@@ -165,6 +170,7 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
     public void FillSchema(DataTable table)
     {
         using var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
         command.CommandText = $@"Select * From [{table.TableName}]";
         command.CommandType = CommandType.Text;
 
@@ -174,8 +180,9 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
 
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true)
     {
-        using var reader = Connection
-            .CreateCommand()
+        var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
+        using var reader = command
             .ExecuteReader($@"Select name From sys.databases {(excludeSysDb ? "Where database_id > 4" : "")}");
         while (reader.Read())
         {
@@ -185,7 +192,9 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
 
     public IEnumerable<string> GetTableNames()
     {
-        using var reader = Connection.CreateCommand().ExecuteReader(@$"SELECT name FROM sys.tables;");
+        var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
+        using var reader = command.ExecuteReader(@$"SELECT name FROM sys.tables;");
         while (reader.Read())
         {
             yield return (string)reader["name"];
@@ -194,8 +203,9 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
 
     public void CreateTable(DataTable table, bool overrideIfExist = false)
     {
-        var exist = (int)Connection
-            .CreateCommand()
+        var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
+        var exist = (int)command
             .ExecuteScalar(
                 "IF EXISTS (" +
                 "SELECT 1 FROM INFORMATION_SCHEMA.TABLES " +
@@ -204,14 +214,17 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
                 ") SELECT 1 ELSE SELECT 0;");
         if (exist == 0)
         {
-            Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSqlForSqlserver(table));
+            command = Connection.CreateCommand();
+            command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
+            command.ExecuteNonQuery(SqlHelper.GetCreateTableSqlForSqlserver(table));
         }
     }
 
     public int GetRowCount(string tableName)
     {
-        return (int)Connection.CreateCommand()
-            .ExecuteScalar($"Select COUNT(1) From [{tableName}]");
+        var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
+        return (int)command.ExecuteScalar($"Select COUNT(1) From [{tableName}]");
     }
 
     public IDbHandler Clone()
@@ -230,6 +243,7 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
         var newConnection = new SqlConnection(ConnectionStringBuilder.ConnectionString);
         await newConnection.OpenAsync();
         await using var command = newConnection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
 
         var reader = command.ExecuteReader($@"SELECT * FROM [{tableName}]");
         return reader;

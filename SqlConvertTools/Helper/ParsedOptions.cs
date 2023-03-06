@@ -27,4 +27,8 @@ internal static class ParsedOptions
     public static int ParallelTablesTransfer { get; set; }
 
     public static IReadOnlyCollection<CustomColumnDataType> CustomColumnDataTypes { get; set; } = null!;
+
+    public static int SourceCommandTimeout { get; set; }
+
+    public static int TargetCommandTimeout { get; set; }
 }
