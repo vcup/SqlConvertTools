@@ -120,6 +120,7 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
             {
                 reader.Dispose();
                 command = Connection.CreateCommand();
+                command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
                 command.ExecuteNonQuery($"Create Database {dbname}");
             }
         }
