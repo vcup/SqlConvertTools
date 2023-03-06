@@ -110,13 +110,17 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
 
     public void ChangeDatabase(string dbname)
     {
-        using (var reader = Connection.CreateCommand()
+        var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
+        using (var reader = command
                    .ExecuteReader(@$"Show Databases Where `Database` not regexp 'schema|sys|mysql' and `Database` = '{dbname}'"))
         {
             if (!reader.HasRows)
             {
                 reader.Dispose();
-                Connection.CreateCommand().ExecuteNonQuery($"Create Database {dbname}");
+                command = Connection.CreateCommand();
+                command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
+                command.ExecuteNonQuery($"Create Database {dbname}");
             }
         }
 
@@ -127,6 +131,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
     public async Task FillQueueAsync(ConcurrentQueue<DataRow> queue, string tableName, CancellationToken token)
     {
         await using var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
         var table = new DataTable(tableName);
         FillSchema(table);
 
@@ -159,6 +164,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
         var tableName = table.TableName;
         var cmdBuilder = new MySqlCommandBuilder(_adapter);
         _adapter.SelectCommand = Connection.CreateCommand();
+        _adapter.SelectCommand.CommandTimeout = ParsedOptions.TargetCommandTimeout;
         _adapter.SelectCommand.CommandText = $@"SELECT * FROM `{tableName}`";
         cmdBuilder.Dispose();
         cmdBuilder = new MySqlCommandBuilder(_adapter);
@@ -196,6 +202,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
     {
         dataSet ??= new DataSet();
         using var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
         command.CommandText = $@"Select * From `{tableName}`";
         command.CommandType = CommandType.Text;
 
@@ -207,6 +214,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
     public void FillSchema(DataTable table)
     {
         using var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
         command.CommandText = $@"Select * From `{table.TableName}`";
         command.CommandType = CommandType.Text;
 
@@ -216,8 +224,9 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
 
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true)
     {
-        using var reader = Connection
-            .CreateCommand()
+        var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
+        using var reader = command
             .ExecuteReader($@"Show Databases{(excludeSysDb ? " where `Database` not regexp 'schema|sys|mysql';" : ';')}");
         while (reader.Read())
         {
@@ -228,7 +237,9 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
     public IEnumerable<string> GetTableNames()
     {
         var key = $"Tables_in_{Connection.Database}";
-        using var reader = Connection.CreateCommand().ExecuteReader(@$"Show Tables;");
+        var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
+        using var reader = command.ExecuteReader(@$"Show Tables;");
         while (reader.Read())
         {
             yield return (string)reader[key];
@@ -237,24 +248,30 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
 
     public void CreateTable(DataTable table, bool overrideIfExist = false)
     {
+        var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
         if (overrideIfExist)
         {
-            Connection.CreateCommand().ExecuteNonQuery($"DROP Table IF EXISTS {table.TableName}");
+            command.ExecuteNonQuery($"DROP Table IF EXISTS {table.TableName}");
         }
         else
         {
-            using var reader = Connection
-                .CreateCommand()
+            using var reader = command
                 .ExecuteReader($"show tables where `Tables_in_{Connection.Database}` = '{table.TableName}';");
             if (reader.HasRows) return;
             reader.Dispose();
         }
-        Connection.CreateCommand().ExecuteNonQuery(SqlHelper.GetCreateTableSqlForMySql(table));
+
+        command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
+        command.ExecuteNonQuery(SqlHelper.GetCreateTableSqlForMySql(table));
     }
 
     public int GetRowCount(string tableName)
     {
-        return (int)Connection.CreateCommand()
+        var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
+        return (int)command
             .ExecuteScalar($"Select COUNT(1) From `{tableName}`")!;
     }
 
@@ -273,6 +290,7 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
     {
         await using var cloneConnection = Connection.Clone();
         await using var command = cloneConnection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
 
         var reader = command.ExecuteReader($@"SELECT * FROM `{tableName}`");
         return reader;
