@@ -124,6 +124,13 @@ public class SqlServerToMySqlCommand : Command
         };
         customColumnDataTypeOption.SetDefaultValue(Array.Empty<CustomColumnDataType>());
 
+        var sourceCommandTimeoutOption = new Option<int>("--source-command-timeout",
+            "sql command execution expire time in sqlserver, use 0 to avoid timeout, unit is second");
+        var targetCommandTimeoutOption = new Option<int>("--target-command-timeout",
+            "sql command execution expire time in mysql server, use 0 to avoid timeout, unit is second");
+        sourceCommandTimeoutOption.SetDefaultValue(0);
+        targetCommandTimeoutOption.SetDefaultValue(0);
+
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
         AddArgument(transferDatabase);
@@ -139,6 +146,8 @@ public class SqlServerToMySqlCommand : Command
         AddOption(overrideTableIfExistOption);
         AddOption(parallelTablesTransferOption);
         AddOption(customColumnDataTypeOption);
+        AddOption(sourceCommandTimeoutOption);
+        AddOption(targetCommandTimeoutOption);
 
         this.SetHandler(async content =>
         {
@@ -155,6 +164,8 @@ public class SqlServerToMySqlCommand : Command
             OverrideTableIfExist = Vo(overrideTableIfExistOption);
             ParallelTablesTransfer = Vo(parallelTablesTransferOption);
             CustomColumnDataTypes = Vo(customColumnDataTypeOption)!;
+            SourceCommandTimeout = Vo(sourceCommandTimeoutOption);
+            TargetCommandTimeout = Vo(targetCommandTimeoutOption);
 
             await Run(Va(sourceAddressArgument)!, Va(targetAddressArgument)!,
                 Va(transferDatabase)!);
