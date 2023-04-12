@@ -55,7 +55,7 @@ public static class LoggingHelper
                 if (ignoreTables.Any(i => i.Equals(tblName, StringComparison.OrdinalIgnoreCase)))
                 {
                     Console.WriteLine($"Ignored table: {tblName}, " +
-                                      $"this will skip {rowCount} row\n");
+                                      $"this will skip {rowCount} rows\n");
                     return;
                 }
 
