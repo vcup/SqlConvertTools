@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data;
 using System.Text;
 
@@ -6,8 +7,8 @@ namespace SqlConvertTools.Helper;
 public static class LoggingHelper
 {
     private static readonly object LogLock = new();
-    public static long TotalCount { get; set; }
-    public static long CurrentCount { get; set; }
+    public static ConcurrentDictionary<string, long> TotalCounts { get; set; } = new();
+    public static ConcurrentDictionary<string, long> CurrentCounts { get; set; } = new();
     public static long PrevCount { get; set; }
 
     public static string CurrentTableName { get; set; } = string.Empty;
@@ -20,7 +21,7 @@ public static class LoggingHelper
         var prevLoggedLength = 0;
         while (!token.IsCancellationRequested)
         {
-            str.Append($"{PrevCount:D6}/{TotalCount:D6} +{CurrentCount - PrevCount:D5} ~[{CurrentTableName}] |{InCompleteTasks.Length}|");
+            str.Append($"{PrevCount:D6}/{TotalCounts.Values.Sum():D6} +{CurrentCounts.Values.Sum() - PrevCount:D5} ~[{CurrentTableName}] |{InCompleteTasks.Length}|");
             if (str.Length < prevLoggedLength) str.Append(' ', prevLoggedLength - str.Length);
 
             lock (LogLock)
@@ -30,7 +31,7 @@ public static class LoggingHelper
                 prevLoggedLength = str.Length;
             }
 
-            PrevCount = CurrentCount;
+            PrevCount = CurrentCounts.Values.Sum();
             str.Clear();
             await Task.Delay(300, token);
         }

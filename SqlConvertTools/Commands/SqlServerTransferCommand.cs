@@ -167,14 +167,16 @@ public class SqlServerTransferCommand : Command
         using var sourceDb = new SqlserverHandler(sourceConnectString);
         using var targetDb = new SqlserverHandler(targetConnectString);
 
+        var totalCount = 0L;
         var counter = new Dictionary<object, long>();
+        var transferTaskIdentity = sourceConnectString + targetConnectString;
 
         targetDb.BulkCopyEvent += (sender, args) =>
         {
             lock (counter)
             {
                 counter[sender] = args.RowsCopied;
-                LoggingHelper.CurrentCount = counter.Values.Sum();
+                LoggingHelper.CurrentCounts[transferTaskIdentity] = counter.Values.Sum();
             }
         };
 
@@ -199,7 +201,8 @@ public class SqlServerTransferCommand : Command
             await LoggingHelper.LogTables(tblName, table, ignoreTables, rowCount);
 
             if (rowCount is 0) continue;
-            LoggingHelper.TotalCount += rowCount;
+            totalCount += rowCount;
+            LoggingHelper.TotalCounts[transferTaskIdentity] = totalCount;
 
             if (tasks.Any(i => i.IsFaulted)) await Task.WhenAll(tasks);
 
@@ -217,8 +220,7 @@ public class SqlServerTransferCommand : Command
         {
         }
 
-        Console.WriteLine($"Success transfer Database " +
-                          $"{targetDb.ConnectionStringBuilder.InitialCatalog} for {LoggingHelper.TotalCount} row\n");
-        LoggingHelper.PrevCount = LoggingHelper.CurrentCount = LoggingHelper.TotalCount = 0;
+        Console.WriteLine("Success transfer Database " +
+                          $"{targetDb.ConnectionStringBuilder.InitialCatalog} for {totalCount} rows");
     }
 }

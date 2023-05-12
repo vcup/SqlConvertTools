@@ -274,11 +274,12 @@ public class SqlServerToMySqlCommand : Command
 
         var totalCount = 0L;
         var counter = new ConcurrentDictionary<object, long>();
+        var transferTaskIdentity = sourceConnectString + targetConnectString;
         // collect copied rows count
         targetDb.BulkCopyEvent += (sender, args) =>
         {
             counter[sender] = args.EventArguments!.RowsCopied;
-            LoggingHelper.CurrentCount = counter.Values.Sum();
+            LoggingHelper.CurrentCounts[transferTaskIdentity] = counter.Values.Sum();
             LoggingHelper.CurrentTableName = args.TableName;
         };
 
@@ -295,7 +296,8 @@ public class SqlServerToMySqlCommand : Command
             await LoggingHelper.LogTables(tblName, table, ignoreTables, rowCount);
 
             if (rowCount is 0 || ignoreTables.Contains(tblName, StringComparer.OrdinalIgnoreCase)) continue;
-            totalCount += LoggingHelper.TotalCount += rowCount;
+            totalCount += rowCount;
+            LoggingHelper.TotalCounts[transferTaskIdentity] = totalCount;
 
             if (tasks.Any(i => i.IsFaulted)) await Task.WhenAll(tasks);
 
