@@ -229,7 +229,7 @@ public static class SqlHelper
                     return "boolean";
                 case "System.Byte":
                     return "tinyint unsigned";
-                case "System.Byte[]" when column.MaxLength > 16777215:
+                case "System.Byte[]" when column.MaxLength is -1 or > 16777215:
                     return "longblob";
                 case "System.Byte[]" when column.MaxLength > 65535:
                     return "mediumblob";
