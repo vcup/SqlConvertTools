@@ -234,7 +234,7 @@ public static class SqlHelper
                 case "System.Byte[]" when column.MaxLength > 65535:
                     return "mediumblob";
                 case "System.Byte[]":
-                    return column.MaxLength > 0 ? $"binary({column.MaxLength})" : "binary(MAX)";
+                    return "blob";
                 case "System.DateTime":
                 case "System.DateTimeOffset":
                     return "datetime";
