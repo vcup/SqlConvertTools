@@ -229,8 +229,12 @@ public static class SqlHelper
                     return "boolean";
                 case "System.Byte":
                     return "tinyint unsigned";
+                case "System.Byte[]" when column.MaxLength > 16777215:
+                    return "longblob";
+                case "System.Byte[]" when column.MaxLength > 65535:
+                    return "mediumblob";
                 case "System.Byte[]":
-                    return "binary";
+                    return column.MaxLength > 0 ? $"binary({column.MaxLength})" : "binary(MAX)";
                 case "System.DateTime":
                 case "System.DateTimeOffset":
                     return "datetime";
