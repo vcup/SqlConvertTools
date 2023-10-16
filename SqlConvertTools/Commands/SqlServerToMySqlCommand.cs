@@ -189,8 +189,7 @@ public class SqlServerToMySqlCommand : Command
         {
             Server = targetAddress,
             UserID = TargetUserName ?? "root",
-            Password = TargetPassword ?? Password ??
-                throw new ArgumentException("has not available password for target sqlserver")
+            Password = TargetPassword ?? Password ?? throw new ArgumentException("has not available password for target mysql")
         };
         if (!transferDatabase.Any())
         {
