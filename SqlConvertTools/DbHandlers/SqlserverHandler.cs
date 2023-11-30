@@ -8,7 +8,7 @@ using SqlConvertTools.Helper;
 
 namespace SqlConvertTools.DbHandlers;
 
-internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableDbHandler, IDisposable
+internal class SqlserverHandler : IDbHandler, IBulkCopyableDbHandler, IDisposable
 {
     private SqlConnection? _connection;
     private readonly SqlDataAdapter _adapter;
@@ -126,33 +126,6 @@ internal class SqlserverHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCop
         }
 
         Connection.ChangeDatabase(ConnectionStringBuilder.InitialCatalog = dbname);
-    }
-
-    public async Task FillQueueAsync(ConcurrentQueue<DataRow> queue, string tableName, CancellationToken token)
-    {
-        await using var command = Connection.CreateCommand();
-        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
-        var table = new DataTable(tableName);
-        FillSchema(table);
-
-        await using var reader = command.ExecuteReader($@"SELECT * FROM [{tableName}]");
-        var colCount = reader.FieldCount;
-        var items = new object?[colCount];
-
-        while (await reader.ReadAsync(token) && !token.IsCancellationRequested)
-        {
-            for (var j = 0; j < colCount;)
-            {
-                items[j] = reader[j++];
-            }
-
-            queue.Enqueue(table.LoadDataRow(items, LoadOption.Upsert));
-        }
-    }
-
-    public Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token, CancellationToken forceToken)
-    {
-        throw new NotImplementedException("origin impl is not tested");
     }
 
     public DataSet FillSchema(string tableName, DataSet? dataSet)

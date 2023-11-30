@@ -10,7 +10,7 @@ using SqlConvertTools.Utils;
 
 namespace SqlConvertTools.DbHandlers;
 
-public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableDbHandler, IDisposable
+public class MysqlHandler : IDbHandler, IBulkCopyableDbHandler, IDisposable
 {
     private MySqlConnection? _connection;
     private readonly MySqlDataAdapter _adapter;
@@ -125,77 +125,6 @@ public class MysqlHandler : IDbHandler, IAsyncQueueableDbHandler, IBulkCopyableD
         }
 
         Connection.ChangeDatabase(ConnectionStringBuilder.Database = dbname);
-    }
-
-    [Obsolete("isn't using")]
-    public async Task FillQueueAsync(ConcurrentQueue<DataRow> queue, string tableName, CancellationToken token)
-    {
-        await using var command = Connection.CreateCommand();
-        command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
-        var table = new DataTable(tableName);
-        FillSchema(table);
-
-        await using var reader = command.ExecuteReader($@"SELECT * FROM `{tableName}`");
-        var colCount = reader.FieldCount;
-        var items = new object?[colCount];
-
-        while (reader.Read() && !token.IsCancellationRequested)
-        {
-            for (var j = 0; j < colCount;)
-            {
-                items[j] = reader[j++];
-            }
-
-            queue.Enqueue(table.LoadDataRow(items, LoadOption.Upsert));
-        }
-    }
-
-    [Obsolete("isn't using")]
-    public async Task PeekQueueAsync(ConcurrentQueue<DataRow> queue, CancellationToken token,
-        CancellationToken forceToken)
-    {
-        begin:
-        if (!queue.TryDequeue(out var row))
-        {
-            goto begin;
-        }
-
-        var table = row.Table;
-        var tableName = table.TableName;
-        var cmdBuilder = new MySqlCommandBuilder(_adapter);
-        _adapter.SelectCommand = Connection.CreateCommand();
-        _adapter.SelectCommand.CommandTimeout = ParsedOptions.TargetCommandTimeout;
-        _adapter.SelectCommand.CommandText = $@"SELECT * FROM `{tableName}`";
-        cmdBuilder.Dispose();
-        cmdBuilder = new MySqlCommandBuilder(_adapter);
-
-        var cmd = cmdBuilder.GetInsertCommand();
-        if (DbHelper.TryGetIdentityColumn(table.Columns, out var idCol))
-        {
-            cmd.CommandText = cmd.CommandText
-                .InsertAfter($"`{tableName}` (", $"`{idCol.ColumnName}`, ", StringComparison.OrdinalIgnoreCase)
-                .InsertAfter("VALUES (", "@p0, ", StringComparison.OrdinalIgnoreCase);
-            cmd.Parameters.Insert(0, new MySqlParameter("@p0", MySqlDbType.Int32, 0, idCol.ColumnName));
-        }
-
-        while (!forceToken.IsCancellationRequested)
-        {
-            if (queue.IsEmpty && token.IsCancellationRequested) break;
-            if (!queue.TryDequeue(out row))
-            {
-                // ReSharper disable once MethodSupportsCancellation
-                await Task.Delay(300);
-                continue;
-            }
-
-            for (var i = 0; i < cmd.Parameters.Count; i++)
-            {
-                cmd.Parameters[i].Value = row.ItemArray[i];
-            }
-
-            // ReSharper disable once MethodSupportsCancellation
-            await cmd.ExecuteNonQueryAsync();
-        }
     }
 
     public DataSet FillSchema(string tableName, DataSet? dataSet)
