@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using Microsoft.Data.SqlClient;
 using SqlConvertTools.Extensions;
 using SqlConvertTools.Helper;
@@ -128,6 +129,28 @@ internal class SqlserverHandler : IDbHandler, IBulkCopyableDbHandler, IDisposabl
         }
 
         Connection.ChangeDatabase(ConnectionStringBuilder.InitialCatalog = dbname);
+    }
+
+    public void FillSchemaMap(params string[] tables)
+    {
+        var tblArrInSql = new StringBuilder();
+        foreach (var table in tables)
+        {
+            tblArrInSql.Append($"'{table}',");
+        }
+
+        tblArrInSql.Remove(tblArrInSql.Length - 1, 1);
+
+        using var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
+        command.CommandText = $"SELECT TABLE_NAME, TABLE_SCHEMA FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME in ({tblArrInSql})";
+        command.CommandType = CommandType.Text;
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            SchemaMap[(reader["TABLE_NAME"] as string)!] = (reader["TABLE_SCHEMA"] as string)!;
+        }
     }
 
     public DataSet FillSchema(string tableName, DataSet? dataSet)

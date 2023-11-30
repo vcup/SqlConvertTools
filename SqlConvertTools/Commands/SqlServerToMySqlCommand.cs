@@ -268,6 +268,8 @@ public class SqlServerToMySqlCommand : Command
             }
         }
 
+        sourceDb.FillSchemaMap(tables);
+
         var tokenSource = new CancellationTokenSource();
         var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
 
