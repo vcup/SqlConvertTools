@@ -35,6 +35,8 @@ internal class SqlserverHandler : IDbHandler, IBulkCopyableDbHandler, IDisposabl
         ConnectionStringBuilder = connectionStringBuilder;
     }
 
+    public Dictionary<string, string> SchemaMap { get; } = new();
+
     public SqlConnectionStringBuilder ConnectionStringBuilder { get; }
     DbConnectionStringBuilder IDbHandler.ConnectionStringBuilder => ConnectionStringBuilder;
 
@@ -130,10 +132,12 @@ internal class SqlserverHandler : IDbHandler, IBulkCopyableDbHandler, IDisposabl
 
     public DataSet FillSchema(string tableName, DataSet? dataSet)
     {
+        if (!SchemaMap.TryGetValue(tableName, out var schema)) schema = "dbo";
+
         dataSet ??= new DataSet();
         using var command = Connection.CreateCommand();
         command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
-        command.CommandText = $@"Select * From [{tableName}]";
+        command.CommandText = $@"Select * From [{schema}].[{tableName}]";
         command.CommandType = CommandType.Text;
 
         _adapter.SelectCommand = command;
@@ -143,9 +147,11 @@ internal class SqlserverHandler : IDbHandler, IBulkCopyableDbHandler, IDisposabl
 
     public void FillSchema(DataTable table)
     {
+        if (!SchemaMap.TryGetValue(table.TableName, out var schema)) schema = "dbo";
+
         using var command = Connection.CreateCommand();
         command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
-        command.CommandText = $@"Select * From [{table.TableName}]";
+        command.CommandText = $@"Select * From [{schema}].[{table.TableName}]";
         command.CommandType = CommandType.Text;
 
         _adapter.SelectCommand = command;
@@ -196,9 +202,10 @@ internal class SqlserverHandler : IDbHandler, IBulkCopyableDbHandler, IDisposabl
 
     public int GetRowCount(string tableName)
     {
+        if (!SchemaMap.TryGetValue(tableName, out var schema)) schema = "dbo";
         var command = Connection.CreateCommand();
         command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
-        return (int)command.ExecuteScalar($"Select COUNT(1) From [{tableName}]");
+        return (int)command.ExecuteScalar($"Select COUNT(1) From [{schema}].[{tableName}]");
     }
 
     public IDbHandler Clone()
@@ -214,12 +221,14 @@ internal class SqlserverHandler : IDbHandler, IBulkCopyableDbHandler, IDisposabl
 
     public async Task<IDataReader> CreateDataReader(string tableName)
     {
+        if (!SchemaMap.TryGetValue(tableName, out var schema)) schema = "dbo";
+
         var newConnection = new SqlConnection(ConnectionStringBuilder.ConnectionString);
         await newConnection.OpenAsync();
         await using var command = newConnection.CreateCommand();
         command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
 
-        var reader = command.ExecuteReader($@"SELECT * FROM [{tableName}]");
+        var reader = command.ExecuteReader($@"SELECT * FROM [{schema}].[{tableName}]");
         return reader;
     }
 
