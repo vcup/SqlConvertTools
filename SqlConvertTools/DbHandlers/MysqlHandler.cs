@@ -181,7 +181,7 @@ public class MysqlHandler : IDbHandler, IBulkCopyableDbHandler, IDisposable
         command.CommandTimeout = ParsedOptions.TargetCommandTimeout;
         if (overrideIfExist)
         {
-            command.ExecuteNonQuery($"DROP Table IF EXISTS {table.TableName}");
+            command.ExecuteNonQuery($"DROP Table IF EXISTS `{table.TableName}`");
         }
         else
         {
@@ -230,7 +230,7 @@ public class MysqlHandler : IDbHandler, IBulkCopyableDbHandler, IDisposable
         await using var connectionCopy = Connection.CloneWith(ConnectionStringBuilder.ConnectionString);
         var bulkCopy = new MySqlBulkCopy(connectionCopy)
         {
-            DestinationTableName = tableName,
+            DestinationTableName = '`' + tableName + '`',
             NotifyAfter = 51,
         };
         var eventArgs = new DbHandleBulkRowsCopiedEventArgs<MySqlRowsCopiedEventArgs>()
