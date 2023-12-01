@@ -31,4 +31,8 @@ internal static class ParsedOptions
     public static int SourceCommandTimeout { get; set; }
 
     public static int TargetCommandTimeout { get; set; }
+
+    public static string[] IgnoreSchemas { get; set; } = null!;
+
+    public static IReadOnlyDictionary<string, string[]> IgnoreDatabaseSchemas { get; set; } = null!;
 }

@@ -131,6 +131,39 @@ public class SqlServerToMySqlCommand : Command
         sourceCommandTimeoutOption.SetDefaultValue(0);
         targetCommandTimeoutOption.SetDefaultValue(0);
 
+        var ignoreSchemasOption = new Option<string[]>("--ignore-schemas", "ignore the given schema")
+        {
+            AllowMultipleArgumentsPerToken = true,
+        };
+        var ignoreDatabaseSchemasOption = new Option<IReadOnlyDictionary<string, IEnumerable<string>>>(
+            "--ignore-database-schemas",
+            result =>
+            {
+                var parseResult = new Dictionary<string, IEnumerable<string>>();
+                var parsingSplit = result.Tokens
+                    .Select(i => i.Value.Split(':'))
+                    .Select(i => (i[0], i[1..]));
+                foreach (var (key, value) in parsingSplit)
+                {
+                    if (parseResult.TryGetValue(key, out var list))
+                    {
+                        (list as List<string>)!.AddRange(value);
+                    }
+                    else
+                    {
+                        parseResult[key] = new List<string>(value);
+                    }
+                }
+
+                return parseResult;
+            })
+        {
+            Description = "ignore tables in the given schema.\n" +
+                          "example -> dbname:schema:schema1 => dbname: [schema, schema1]",
+            Arity = ArgumentArity.ZeroOrMore,
+            AllowMultipleArgumentsPerToken = true,
+        };
+
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
         AddArgument(transferDatabase);
@@ -148,6 +181,8 @@ public class SqlServerToMySqlCommand : Command
         AddOption(customColumnDataTypeOption);
         AddOption(sourceCommandTimeoutOption);
         AddOption(targetCommandTimeoutOption);
+        AddOption(ignoreSchemasOption);
+        AddOption(ignoreDatabaseSchemasOption);
 
         this.SetHandler(async content =>
         {
@@ -166,6 +201,11 @@ public class SqlServerToMySqlCommand : Command
             CustomColumnDataTypes = Vo(customColumnDataTypeOption)!;
             SourceCommandTimeout = Vo(sourceCommandTimeoutOption);
             TargetCommandTimeout = Vo(targetCommandTimeoutOption);
+            IgnoreSchemas = Vo(ignoreSchemasOption) ?? Array.Empty<string>();
+            IgnoreDatabaseSchemas = Vo(ignoreDatabaseSchemasOption)?
+                .ToDictionary(kp => kp.Key,
+                    kp => kp.Value.ToArray()
+                ) ?? new Dictionary<string, string[]>();
 
             await Run(Va(sourceAddressArgument)!, Va(targetAddressArgument)!,
                 Va(transferDatabase)!);
@@ -219,18 +259,24 @@ public class SqlServerToMySqlCommand : Command
             }
 
             IEnumerable<string> buildIgnoreTable = IgnoreTables;
-            if (IgnoreDatabaseTables.TryGetValue(dbname, out var item))
+            if (IgnoreDatabaseTables.TryGetValue(dbname, out var tables))
             {
-                buildIgnoreTable = IgnoreTables.Concat(item);
+                buildIgnoreTable = IgnoreTables.Concat(tables);
+            }
+
+            IEnumerable<string> buildIgnoreSchema = IgnoreSchemas;
+            if (IgnoreDatabaseSchemas.TryGetValue(dbname, out var schemas))
+            {
+                buildIgnoreSchema = buildIgnoreSchema.Concat(schemas);
             }
 
             await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
-                buildIgnoreTable.ToArray(), tblNameMatchers);
+                buildIgnoreTable.ToArray(), buildIgnoreSchema.ToArray(), tblNameMatchers);
         }
     }
 
     private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
-        string[] ignoreTables, IReadOnlyCollection<Regex> tblNameMatchers)
+        string[] ignoreTables, string[] ignoreSchemas, IReadOnlyCollection<Regex> tblNameMatchers)
     {
         ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
         var sourceDb = new SqlserverHandler(sourceConnectString);
@@ -269,6 +315,13 @@ public class SqlServerToMySqlCommand : Command
         }
 
         sourceDb.FillSchemaMap(tables);
+        if (ignoreSchemas.Any())
+        {
+            var ignoredTablesBySchemas = sourceDb.SchemaMap
+                .Where(kp => ignoreSchemas.Contains(kp.Value))
+                .Select(kp => kp.Key);
+            tables = tables.Except(ignoredTablesBySchemas).ToArray();
+        }
 
         var tokenSource = new CancellationTokenSource();
         var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
