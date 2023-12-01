@@ -193,7 +193,7 @@ public static class SqlHelper
 
             foreach (var t in table.PrimaryKey)
             {
-                sql.Append($"{t.ColumnName},");
+                sql.Append($"`{t.ColumnName}`,");
             }
 
             sql.Remove(sql.Length - 1, 1);
