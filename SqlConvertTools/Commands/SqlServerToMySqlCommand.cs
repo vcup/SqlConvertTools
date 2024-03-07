@@ -127,6 +127,17 @@ public class SqlServerToMySqlCommand : Command
             Arity = ArgumentArity.ZeroOrMore,
             AllowMultipleArgumentsPerToken = true,
         };
+        var onlyDatabaseSchemasOption = new Option<IReadOnlyDictionary<string, string[]>>(
+            "--only-database-schemas",
+            KeyValuesArgumentsParser.Parse
+        )
+        {
+            Description = "only transfer the tables in the given schema.\n" +
+                          "no effect when --ignore[-database]-schemas specified\n" +
+                          "example -> dbname:schema:schema1 => dbname: [schema, schema1]",
+            Arity = ArgumentArity.ZeroOrMore,
+            AllowMultipleArgumentsPerToken = true,
+        };
 
         AddArgument(sourceAddressArgument);
         AddArgument(targetAddressArgument);
@@ -147,6 +158,7 @@ public class SqlServerToMySqlCommand : Command
         AddOption(targetCommandTimeoutOption);
         AddOption(ignoreSchemasOption);
         AddOption(ignoreDatabaseSchemasOption);
+        AddOption(onlyDatabaseSchemasOption);
 
         this.SetHandler(async content =>
         {
@@ -166,6 +178,7 @@ public class SqlServerToMySqlCommand : Command
             TargetCommandTimeout = Vo(targetCommandTimeoutOption);
             IgnoreSchemas = Vo(ignoreSchemasOption) ?? Array.Empty<string>();
             IgnoreDatabaseSchemas = Vo(ignoreDatabaseSchemasOption) ?? new Dictionary<string, string[]>();
+            OnlyDatabaseSchemas = Vo(onlyDatabaseSchemasOption) ?? new Dictionary<string, string[]>();
 
             await Run(Va(sourceAddressArgument)!, Va(targetAddressArgument)!,
                 Va(transferDatabase)!);
@@ -231,12 +244,15 @@ public class SqlServerToMySqlCommand : Command
             }
 
             await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
-                buildIgnoreTable.ToArray(), buildIgnoreSchema.ToArray(), tblNameMatchers);
+                buildIgnoreTable.ToArray(), buildIgnoreSchema.ToArray(),
+                OnlyDatabaseSchemas.GetValueOrDefault(dbname, Array.Empty<string>()),
+                tblNameMatchers
+            );
         }
     }
 
     private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
-        string[] ignoreTables, string[] ignoreSchemas, IReadOnlyCollection<Regex> tblNameMatchers)
+        string[] ignoreTables, string[] ignoreSchemas, string[] onlySchemas, IReadOnlyCollection<Regex> tblNameMatchers)
     {
         ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
         var sourceDb = new SqlserverHandler(sourceConnectString);
@@ -275,10 +291,13 @@ public class SqlServerToMySqlCommand : Command
         }
 
         sourceDb.FillSchemaMap(tables);
-        if (ignoreSchemas.Any())
+        if (ignoreSchemas.Any() || onlySchemas.Any())
         {
             var ignoredTablesBySchemas = sourceDb.SchemaMap
-                .Where(kp => ignoreSchemas.Contains(kp.Value))
+                .Where(kp =>
+                    ignoreSchemas.Contains(kp.Value) ||
+                    !onlySchemas.Contains(kp.Value)
+                )
                 .Select(kp => kp.Key);
             tables = tables.Except(ignoredTablesBySchemas).ToArray();
         }

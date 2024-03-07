@@ -35,4 +35,6 @@ internal static class ParsedOptions
     public static string[] IgnoreSchemas { get; set; } = null!;
 
     public static IReadOnlyDictionary<string, string[]> IgnoreDatabaseSchemas { get; set; } = null!;
+
+    public static IReadOnlyDictionary<string, string[]> OnlyDatabaseSchemas { get; set; } = null!;
 }
