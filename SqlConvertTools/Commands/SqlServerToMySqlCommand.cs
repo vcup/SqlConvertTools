@@ -366,10 +366,11 @@ public class SqlServerToMySqlCommand : Command
             var table = new DataTable(tblName);
             dbSet.Tables.Add(table);
             sourceDb.FillSchema(table);
-            targetDb.CreateTable(table, OverrideTableIfExist);
 
             var rowCount = sourceDb.GetRowCount(tblName);
             await LoggingHelper.LogTables(tblName, table, ignoreTables, rowCount);
+
+            targetDb.CreateTable(table, OverrideTableIfExist);
 
             if (rowCount is 0 || ignoreTables.Contains(tblName, StringComparer.OrdinalIgnoreCase)) continue;
             totalCount += rowCount;
