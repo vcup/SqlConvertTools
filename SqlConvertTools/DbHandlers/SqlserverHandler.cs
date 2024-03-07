@@ -197,10 +197,14 @@ internal class SqlserverHandler : IDbHandler, IBulkCopyableDbHandler, IDisposabl
     {
         var command = Connection.CreateCommand();
         command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
-        using var reader = command.ExecuteReader(@$"SELECT name FROM sys.tables;");
+        using var reader = command.ExecuteReader(
+            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES " +
+            "WHERE TABLE_NAME NOT IN (SELECT name FROM sys.objects WHERE is_ms_shipped = 1) " +
+            "AND TABLE_TYPE = 'BASE TABLE';"
+        );
         while (reader.Read())
         {
-            yield return (string)reader["name"];
+            yield return (string)reader["TABLE_NAME"];
         }
     }
 
