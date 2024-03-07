@@ -61,6 +61,25 @@ public class SqlServerToMySqlCommand : Command
             AllowMultipleArgumentsPerToken = true,
         };
 
+        var ignoreTablesWithoutCreateOption = new Option<string[]>(
+            "--ignore-tables-without-create",
+            "ignore the given tables, and do not create them.\n do not create if also specified in '--ignore[-database]-tables'"
+        )
+        {
+            AllowMultipleArgumentsPerToken = true,
+        };
+        var ignoreTablesWithoutCreateForDatabaseOption = new Option<IReadOnlyDictionary<string, string[]>>(
+            "--ignore-database-tables-without-create",
+            KeyValuesArgumentsParser.Parse
+        )
+        {
+            Description = "ignore the given tables, and do not create them.\n" +
+                          "do not create if also specified in '--ignore[-database]-tables'\n" +
+                          "example -> dbname:tblName:tblName1 => dbname: [tblName, tblName1]",
+            Arity = ArgumentArity.ZeroOrMore,
+            AllowMultipleArgumentsPerToken = true
+        };
+
         var customDatabaseNamesOption = new Option<IReadOnlyDictionary<string, string>>(
             "--custom-database-names",
             result => new Dictionary<string, string>(result.Tokens
@@ -98,7 +117,7 @@ public class SqlServerToMySqlCommand : Command
                     Database = i.Length > 3 ? i[^4] : null,
                 })
                 .ToArray()
-            )
+        )
         {
             Description = "custom some column data type, usage: '[[dbname:]table:]column:bitint'\n",
             Arity = ArgumentArity.ZeroOrMore,
@@ -149,6 +168,8 @@ public class SqlServerToMySqlCommand : Command
         AddOption(targetPasswordOption);
         AddOption(ignoreTablesOption);
         AddOption(ignoreTablesForDatabasesOption);
+        AddOption(ignoreTablesWithoutCreateOption);
+        AddOption(ignoreTablesWithoutCreateForDatabaseOption);
         AddOption(customDatabaseNamesOption);
         AddOption(trustSourceOption);
         AddOption(overrideTableIfExistOption);
@@ -169,6 +190,9 @@ public class SqlServerToMySqlCommand : Command
             TargetPassword = Vo(targetPasswordOption);
             IgnoreTables = Vo(ignoreTablesOption) ?? Array.Empty<string>();
             IgnoreDatabaseTables = Vo(ignoreTablesForDatabasesOption) ?? new Dictionary<string, string[]>();
+            IgnoreTablesWithoutCreate = Vo(ignoreTablesWithoutCreateOption) ?? Array.Empty<string>();
+            IgnoreDatabaseTablesWithoutCreate = Vo(ignoreTablesWithoutCreateForDatabaseOption) ??
+                                                new Dictionary<string, string[]>();
             CustomDatabaseNames = Vo(customDatabaseNamesOption) ?? new Dictionary<string, string>();
             TrustSourceCert = Vo(trustSourceOption);
             OverrideTableIfExist = Vo(overrideTableIfExistOption);
@@ -202,7 +226,8 @@ public class SqlServerToMySqlCommand : Command
         {
             Server = targetAddress,
             UserID = TargetUserName ?? "root",
-            Password = TargetPassword ?? Password ?? throw new ArgumentException("has not available password for target mysql")
+            Password = TargetPassword ??
+                       Password ?? throw new ArgumentException("has not available password for target mysql")
         };
         if (!transferDatabase.Any())
         {
@@ -232,9 +257,18 @@ public class SqlServerToMySqlCommand : Command
             }
 
             IEnumerable<string> buildIgnoreTable = IgnoreTables;
-            if (IgnoreDatabaseTables.TryGetValue(dbname, out var tables))
             {
-                buildIgnoreTable = IgnoreTables.Concat(tables);
+                if (IgnoreDatabaseTables.TryGetValue(dbname, out var tables))
+                {
+                    buildIgnoreTable = IgnoreTables.Concat(tables);
+                }
+            }
+            IEnumerable<string> buildIgnoreTablesWithoutCreate = IgnoreTablesWithoutCreate;
+            {
+                if (IgnoreDatabaseTablesWithoutCreate.TryGetValue(dbname, out var tables))
+                {
+                    buildIgnoreTablesWithoutCreate = IgnoreTablesWithoutCreate.Concat(tables);
+                }
             }
 
             IEnumerable<string> buildIgnoreSchema = IgnoreSchemas;
@@ -243,16 +277,24 @@ public class SqlServerToMySqlCommand : Command
                 buildIgnoreSchema = buildIgnoreSchema.Concat(schemas);
             }
 
-            await TransferDatabase(sourceConnStrBuilder.ConnectionString, targetConnStrBuilder.ConnectionString,
-                buildIgnoreTable.ToArray(), buildIgnoreSchema.ToArray(),
+            await TransferDatabase(
+                sourceConnStrBuilder.ConnectionString,
+                targetConnStrBuilder.ConnectionString,
+                buildIgnoreTable.ToArray(),
+                buildIgnoreTablesWithoutCreate,
+                buildIgnoreSchema.ToArray(),
                 OnlyDatabaseSchemas.GetValueOrDefault(dbname, Array.Empty<string>()),
                 tblNameMatchers
             );
         }
     }
 
-    private static async Task TransferDatabase(string sourceConnectString, string targetConnectString,
-        string[] ignoreTables, string[] ignoreSchemas, string[] onlySchemas, IReadOnlyCollection<Regex> tblNameMatchers)
+    private static async Task TransferDatabase(
+        string sourceConnectString, string targetConnectString,
+        string[] ignoreTables, IEnumerable<string> ignoreTablesWithoutCreate,
+        string[] ignoreSchemas, string[] onlySchemas,
+        IReadOnlyCollection<Regex> tblNameMatchers
+    )
     {
         ignoreTables = ignoreTables.Select(i => i.ToLower()).ToArray();
         var sourceDb = new SqlserverHandler(sourceConnectString);
@@ -267,11 +309,12 @@ public class SqlServerToMySqlCommand : Command
             if (!targetDb.TryConnect(out var e)) throw e;
         }
 
-        var tables = tblNameMatchers.Count is 0
+        var tmpTables = tblNameMatchers.Count is 0
             ? sourceDb.GetTableNames().ToArray()
             : sourceDb.GetTableNames()
                 .Where(i => tblNameMatchers.Any(j => j.IsMatch(i)))
                 .ToArray();
+        var tables = tmpTables.Except(ignoreTablesWithoutCreate).ToArray();
         if (OverrideTableIfExist)
         {
             var overrideTables = targetDb.GetTableNames()
@@ -336,7 +379,8 @@ public class SqlServerToMySqlCommand : Command
 
             var reader = await sourceDb.CreateDataReader(tblName);
             LoggingHelper.InCompleteTasks = tasks.Where(i => !i.IsCompleted).ToArray();
-            if (LoggingHelper.InCompleteTasks.Length == ParallelTablesTransfer) await Task.WhenAny(LoggingHelper.InCompleteTasks);
+            if (LoggingHelper.InCompleteTasks.Length == ParallelTablesTransfer)
+                await Task.WhenAny(LoggingHelper.InCompleteTasks);
             tasks.Add(targetDb.BulkCopy(tblName, reader));
         }
 

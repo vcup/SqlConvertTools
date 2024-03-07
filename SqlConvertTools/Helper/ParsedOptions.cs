@@ -18,7 +18,12 @@ internal static class ParsedOptions
 
     public static IReadOnlyDictionary<string, string[]> IgnoreDatabaseTables { get; set; } = null!;
 
+    public static string[] IgnoreTablesWithoutCreate { get; set; } = null!;
+
+    public static IReadOnlyDictionary<string, string[]> IgnoreDatabaseTablesWithoutCreate { get; set; } = null!;
+
     public static IReadOnlyDictionary<string, string> CustomDatabaseNames { get; set; } = null!;
+
 
     public static bool TrustSourceCert { get; set; }
 
