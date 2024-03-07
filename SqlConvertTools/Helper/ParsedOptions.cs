@@ -16,7 +16,7 @@ internal static class ParsedOptions
 
     public static string[] IgnoreTables { get; set; } = null!;
 
-    public static IReadOnlyDictionary<string, IEnumerable<string>> IgnoreDatabaseTables { get; set; } = null!;
+    public static IReadOnlyDictionary<string, string[]> IgnoreDatabaseTables { get; set; } = null!;
 
     public static IReadOnlyDictionary<string, string> CustomDatabaseNames { get; set; } = null!;
 

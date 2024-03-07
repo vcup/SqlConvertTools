@@ -50,28 +50,10 @@ public class SqlServerToMySqlCommand : Command
             {
                 AllowMultipleArgumentsPerToken = true,
             };
-        var ignoreTablesForDatabasesOption = new Option<IReadOnlyDictionary<string, IEnumerable<string>>>(
+        var ignoreTablesForDatabasesOption = new Option<IReadOnlyDictionary<string, string[]>>(
             "--ignore-database-tables",
-            result =>
-            {
-                var parseResult = new Dictionary<string, IEnumerable<string>>();
-                var parsingSplit = result.Tokens
-                    .Select(i => i.Value.Split(':'))
-                    .Select(i => (i[0], i[1..]));
-                foreach (var (key, value) in parsingSplit)
-                {
-                    if (parseResult.TryGetValue(key, out var list))
-                    {
-                        (list as List<string>)!.AddRange(value);
-                    }
-                    else
-                    {
-                        parseResult[key] = new List<string>(value);
-                    }
-                }
-
-                return parseResult;
-            })
+            KeyValuesArgumentsParser.Parse
+        )
         {
             Description = "ignore the given tables, but still create them.\n" +
                           "example -> dbname:tblName:tblName1 => dbname: [tblName, tblName1]",
@@ -135,28 +117,10 @@ public class SqlServerToMySqlCommand : Command
         {
             AllowMultipleArgumentsPerToken = true,
         };
-        var ignoreDatabaseSchemasOption = new Option<IReadOnlyDictionary<string, IEnumerable<string>>>(
+        var ignoreDatabaseSchemasOption = new Option<IReadOnlyDictionary<string, string[]>>(
             "--ignore-database-schemas",
-            result =>
-            {
-                var parseResult = new Dictionary<string, IEnumerable<string>>();
-                var parsingSplit = result.Tokens
-                    .Select(i => i.Value.Split(':'))
-                    .Select(i => (i[0], i[1..]));
-                foreach (var (key, value) in parsingSplit)
-                {
-                    if (parseResult.TryGetValue(key, out var list))
-                    {
-                        (list as List<string>)!.AddRange(value);
-                    }
-                    else
-                    {
-                        parseResult[key] = new List<string>(value);
-                    }
-                }
-
-                return parseResult;
-            })
+            KeyValuesArgumentsParser.Parse
+        )
         {
             Description = "ignore tables in the given schema.\n" +
                           "example -> dbname:schema:schema1 => dbname: [schema, schema1]",
@@ -192,8 +156,7 @@ public class SqlServerToMySqlCommand : Command
             SourcePassword = Vo(sourcePasswordOption);
             TargetPassword = Vo(targetPasswordOption);
             IgnoreTables = Vo(ignoreTablesOption) ?? Array.Empty<string>();
-            IgnoreDatabaseTables = Vo(ignoreTablesForDatabasesOption) ??
-                                                 new Dictionary<string, IEnumerable<string>>();
+            IgnoreDatabaseTables = Vo(ignoreTablesForDatabasesOption) ?? new Dictionary<string, string[]>();
             CustomDatabaseNames = Vo(customDatabaseNamesOption) ?? new Dictionary<string, string>();
             TrustSourceCert = Vo(trustSourceOption);
             OverrideTableIfExist = Vo(overrideTableIfExistOption);
@@ -202,10 +165,7 @@ public class SqlServerToMySqlCommand : Command
             SourceCommandTimeout = Vo(sourceCommandTimeoutOption);
             TargetCommandTimeout = Vo(targetCommandTimeoutOption);
             IgnoreSchemas = Vo(ignoreSchemasOption) ?? Array.Empty<string>();
-            IgnoreDatabaseSchemas = Vo(ignoreDatabaseSchemasOption)?
-                .ToDictionary(kp => kp.Key,
-                    kp => kp.Value.ToArray()
-                ) ?? new Dictionary<string, string[]>();
+            IgnoreDatabaseSchemas = Vo(ignoreDatabaseSchemasOption) ?? new Dictionary<string, string[]>();
 
             await Run(Va(sourceAddressArgument)!, Va(targetAddressArgument)!,
                 Va(transferDatabase)!);
