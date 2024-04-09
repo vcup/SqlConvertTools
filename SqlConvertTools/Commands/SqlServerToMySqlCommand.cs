@@ -338,8 +338,8 @@ public class SqlServerToMySqlCommand : Command
         {
             var ignoredTablesBySchemas = sourceDb.SchemaMap
                 .Where(kp =>
-                    ignoreSchemas.Contains(kp.Value) ||
-                    !onlySchemas.Contains(kp.Value)
+                    (ignoreSchemas.Any() && ignoreSchemas.Contains(kp.Value)) ||
+                    (onlySchemas.Any() && !onlySchemas.Contains(kp.Value))
                 )
                 .Select(kp => kp.Key);
             tables = tables.Except(ignoredTablesBySchemas).ToArray();
