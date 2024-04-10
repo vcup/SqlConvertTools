@@ -309,12 +309,12 @@ public class SqlServerToMySqlCommand : Command
             if (!targetDb.TryConnect(out var e)) throw e;
         }
 
-        var tmpTables = tblNameMatchers.Count is 0
+        var tables = tblNameMatchers.Count is 0
             ? sourceDb.GetTableNames().ToArray()
             : sourceDb.GetTableNames()
                 .Where(i => tblNameMatchers.Any(j => j.IsMatch(i)))
                 .ToArray();
-        var tables = tmpTables.Except(ignoreTablesWithoutCreate).ToArray();
+        tables = tables.Except(ignoreTablesWithoutCreate).ToArray();
         if (OverrideTableIfExist)
         {
             var overrideTables = targetDb.GetTableNames()
