@@ -308,13 +308,28 @@ public class SqlServerToMySqlCommand : Command
         {
             if (!targetDb.TryConnect(out var e)) throw e;
         }
+        var totalCount = 0L;
 
         var tables = tblNameMatchers.Count is 0
             ? sourceDb.GetTableNames().ToArray()
             : sourceDb.GetTableNames()
                 .Where(i => tblNameMatchers.Any(j => j.IsMatch(i)))
                 .ToArray();
+        if (tables.Length is 0)
+        {
+            Console.WriteLine("No available tables present.");
+            if (tblNameMatchers.Count is 0)
+                Console.WriteLine("maybe they are ignored because mismatched the table regex");
+            goto @return;
+        }
+
         tables = tables.Except(ignoreTablesWithoutCreate).ToArray();
+        if (tables.Length is 0)
+        {
+            Console.WriteLine("All available tables are ignored without create.");
+            goto @return;
+        }
+
         if (OverrideTableIfExist)
         {
             var overrideTables = targetDb.GetTableNames()
@@ -348,7 +363,6 @@ public class SqlServerToMySqlCommand : Command
         var tokenSource = new CancellationTokenSource();
         var loggingTask = LoggingHelper.LogForCancel(tokenSource.Token);
 
-        var totalCount = 0L;
         var counter = new ConcurrentDictionary<object, long>();
         var transferTaskIdentity = sourceConnectString + targetConnectString;
         // collect copied rows count
@@ -395,6 +409,7 @@ public class SqlServerToMySqlCommand : Command
         {
         }
 
+        @return:
         Console.WriteLine("Success transfer Database " +
                           $"{targetDb.ConnectionStringBuilder.Database} for {totalCount} rows");
     }
