@@ -179,7 +179,7 @@ public static class SqlHelper
             if (column.AutoIncrementSeed is not 0) sql.Append($"= {column.AutoIncrementSeed}");
             if (column is { AllowDBNull: false, DefaultValue: not DBNull })
             {
-                sql.Append($"DEFAULT ({column.DefaultValue})");
+                sql.Append($"DEFAULT {column.DefaultValue} ");
             }
 
             sql.Append(column.AllowDBNull ? "DEFAULT NULL" : "NOT NULL");
