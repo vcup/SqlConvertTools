@@ -16,12 +16,12 @@ public class DataColumnDefaultValueHandler
 
         text = TrimBracket(text);
         var numberRex = new Regex(@"^\d$");
-        var stringRex = new Regex("^(\"|'|`).*(\"|'|`)$");
+        var stringRex = new Regex("^(N)?(\"|'|`).*(\"|'|`)$");
         DefaultValue = text.ToLowerInvariant() switch
         {
             "false" or "true" => DataColumnDefaultValueEnum.Constant,
             _ when numberRex.IsMatch(text) => DataColumnDefaultValueEnum.Constant,
-            _ when stringRex.IsMatch(text) => DataColumnDefaultValueEnum.Constant,
+            _ when stringRex.IsMatch(text) => DataColumnDefaultValueEnum.String,
             "current_timestamp" or "getdate()" => DataColumnDefaultValueEnum.CurDateTime,
             "uuid()" or "newid()" => DataColumnDefaultValueEnum.Guid,
             "rand()" => DataColumnDefaultValueEnum.Random,
@@ -53,6 +53,7 @@ public class DataColumnDefaultValueHandler
     private string GetForSqlServer() => DefaultValue switch
     {
         DataColumnDefaultValueEnum.Constant => Normalized!,
+        DataColumnDefaultValueEnum.String => Normalized!,
         DataColumnDefaultValueEnum.CurDateTime => "getdate()",
         DataColumnDefaultValueEnum.Guid => "newid()",
         DataColumnDefaultValueEnum.Random => "rand()",
@@ -64,6 +65,7 @@ public class DataColumnDefaultValueHandler
     private string GetForMySql() => DefaultValue switch
     {
         DataColumnDefaultValueEnum.Constant => Normalized!,
+        DataColumnDefaultValueEnum.String => Normalized![0] is 'N' ? Normalized[1..] : Normalized,
         DataColumnDefaultValueEnum.CurDateTime => "CURRENT_TIMESTAMP",
         DataColumnDefaultValueEnum.Guid => "UUID()",
         DataColumnDefaultValueEnum.Random => "RAND()",
