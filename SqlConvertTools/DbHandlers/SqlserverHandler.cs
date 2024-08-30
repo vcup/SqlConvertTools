@@ -1,11 +1,13 @@
-using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Text;
 using Microsoft.Data.SqlClient;
+using Microsoft.IdentityModel.Tokens;
 using SqlConvertTools.Extensions;
 using SqlConvertTools.Helper;
+using SqlConvertTools.Utils;
 
 namespace SqlConvertTools.DbHandlers;
 
@@ -143,7 +145,8 @@ internal class SqlserverHandler : IDbHandler, IBulkCopyableDbHandler, IDisposabl
 
         using var command = Connection.CreateCommand();
         command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
-        command.CommandText = $"SELECT TABLE_NAME, TABLE_SCHEMA FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME in ({tblArrInSql})";
+        command.CommandText =
+            $"SELECT TABLE_NAME, TABLE_SCHEMA FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME in ({tblArrInSql})";
         command.CommandType = CommandType.Text;
 
         using var reader = command.ExecuteReader();
@@ -179,6 +182,29 @@ internal class SqlserverHandler : IDbHandler, IBulkCopyableDbHandler, IDisposabl
 
         _adapter.SelectCommand = command;
         _adapter.FillSchema(table, SchemaType.Mapped);
+    }
+
+    public void FillSchemaWithColumnDefaultValue(DataTable table, DbmsType dbmsType)
+    {
+        var schema = SchemaMap.GetValueOrDefault(table.TableName, "dbo");
+
+        using var command = Connection.CreateCommand();
+        command.CommandTimeout = ParsedOptions.SourceCommandTimeout;
+        command.CommandText =
+            "SELECT COLUMN_NAME, COLUMN_DEFAULT FROM INFORMATION_SCHEMA.COLUMNS WHERE " +
+            $"TABLE_SCHEMA = '{schema}' and TABLE_NAME = '{table.TableName}'";
+        command.CommandType = CommandType.Text;
+
+        var field = typeof(DataColumn).GetField("_defaultValue", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var col = reader.GetString(0);
+            var val = reader[1] as string;
+            if (val.IsNullOrEmpty()) continue;
+            var handler = new DataColumnDefaultValueHandler(val);
+            field.SetValue(table.Columns[col], handler.GetDefaultValue(dbmsType));
+        }
     }
 
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true)

@@ -151,6 +151,9 @@ public class MysqlHandler : IDbHandler, IBulkCopyableDbHandler, IDisposable
         _adapter.FillSchema(table, SchemaType.Mapped);
     }
 
+    public void FillSchemaWithColumnDefaultValue(DataTable table, DbmsType dbmsType) =>
+        throw new NotImplementedException();
+
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true)
     {
         var command = Connection.CreateCommand();

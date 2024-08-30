@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using SqlConvertTools.Utils;
 
 namespace SqlConvertTools.DbHandlers;
 
@@ -31,6 +31,7 @@ public interface IDbHandler
     public DataSet FillSchema(string tableName, DataSet? dataSet);
 
     public void FillSchema(DataTable table);
+    public void FillSchemaWithColumnDefaultValue(DataTable table, DbmsType dbmsType);
 
     public IEnumerable<string> GetDatabases(bool excludeSysDb = true);
 

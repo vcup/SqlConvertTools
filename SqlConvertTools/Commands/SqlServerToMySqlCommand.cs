@@ -380,6 +380,7 @@ public class SqlServerToMySqlCommand : Command
             var table = new DataTable(tblName);
             dbSet.Tables.Add(table);
             sourceDb.FillSchema(table);
+            sourceDb.FillSchemaWithColumnDefaultValue(table, DbmsType.MySql);
 
             var rowCount = sourceDb.GetRowCount(tblName);
             await LoggingHelper.LogTables(tblName, table, ignoreTables, rowCount);

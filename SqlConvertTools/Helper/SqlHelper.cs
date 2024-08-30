@@ -177,9 +177,9 @@ public static class SqlHelper
             sql.Append($" {GetCustomDataType(column) ?? NetTypeMapToMySqlDataType(column)} ");
             if (column.AutoIncrement) sql.Append("AUTO_INCREMENT ");
             if (column.AutoIncrementSeed is not 0) sql.Append($"= {column.AutoIncrementSeed}");
-            if (!column.AllowDBNull && column.DefaultValue is not { })
+            if (column is { AllowDBNull: false, DefaultValue: not DBNull })
             {
-                sql.Append($"DEFAULT {column.DefaultValue}");
+                sql.Append($"DEFAULT ({column.DefaultValue})");
             }
 
             sql.Append(column.AllowDBNull ? "DEFAULT NULL" : "NOT NULL");
